@@ -9,7 +9,6 @@ dependencies:
   - jupyter
   - numpy
   - pandas
-  - wget
-  - unzip
   - pip:
     - git+https://github.com/PatentsView/PatentsView-Evaluation
+    - wget

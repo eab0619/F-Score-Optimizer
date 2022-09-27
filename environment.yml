@@ -1,0 +1,15 @@
+# Development environment for PatentsView-Evaluation
+name: f-score-optimizer
+
+dependencies:
+  - python=3.9
+  - pip
+  - ipython
+  - ipykernel
+  - jupyter
+  - numpy
+  - pandas
+  - wget
+  - unzip
+  - pip:
+    - git+https://github.com/PatentsView/PatentsView-Evaluation

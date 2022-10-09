@@ -21,8 +21,16 @@ data: data-raw/rawinventor.tsv\
 	data-raw/rawlocation.tsv\
 	data-raw/patent.tsv\
 	data-raw/pv-bipartite.tsv\
-	data-raw/RLdata_bipartite.RData
+	data-raw/RLdata_bipartite.RData\
+	data-raw/isr_joined_raw.csv\
+	data-raw/als_joined_raw.csv
 	
+data-raw/isr_joined_raw.csv: scripts/isr_data_raw.py
+	conda run -n ${ENV} python3 $<
+
+data-raw/als_joined_raw.csv: scripts/als_data_raw.py
+	conda run -n ${ENV} python3 $<
+
 data-raw/%.tsv:
 	wget -O $(@F).zip https://s3.amazonaws.com/data.patentsview.org/download/$(@F).zip
 	unzip -o -q $(@F).zip -d $(@D)

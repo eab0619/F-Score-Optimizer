@@ -48,4 +48,4 @@ def get_harmony_rate(merged, first_name = 'name_first', last_name = 'name_last',
     #return merged_cop
     
     #return actual harmony rate
-    sum(merged_cop.groupby(['unique_id'])['harmony'].max())/merged_cop['unique_id'].nunique()
+    return sum(merged_cop.groupby(['unique_id'])['harmony'].max())/merged_cop['unique_id'].nunique()

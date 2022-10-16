@@ -24,7 +24,7 @@ isr_noisy = isr_final.loc[(isr_final.homonomy==1) | (isr_final.var_count>0),:]
 
 ##generation scheme
 
-#by definition n==1 are those without name variation (var_count==1) and homonomy==1
+#by definition n==1 are those without name variation (var_count==0) and homonomy==1
 id1 = isr_noisy.groupby(['unique_id']).size().to_frame('n').reset_index().query('n==1').unique_id
 id2 = isr_noisy.groupby(['unique_id']).size().to_frame('n').reset_index().query('n>1').unique_id
 

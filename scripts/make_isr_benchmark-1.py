@@ -40,8 +40,10 @@ dfB["file"] = "B"
 
 combined = pd.concat([dfA, dfB]).reset_index(drop=True)
 
-print("The Homonomy rate is " + str(bm.get_homonomy_rate(combined)[0]))
-print("The name variation rate is " + str(bm.get_name_var(combined)[0]))
+match_rate = len(dfB.merge(dfA.loc[:,"unique_id"], on='unique_id', how='inner'))/ len(combined)
+print("The match rate is: " + str(match_rate))
+print("The Homonomy rate is: " + str(bm.get_homonomy_rate(combined)[0]))
+print("The name variation rate is: " + str(bm.get_name_var(combined)[0]))
 
 combined.to_csv("../data-raw/isr_benchmark-1.tsv", sep="\t", index=False)
 

@@ -113,15 +113,61 @@ optim_F <- function(posterior, iteration=1, seed=0){
       
       #iterate over matches
       for(i in 1:n1){
+        # calculate f score with z[j] = i
         f_new_match = 2*(tp +posterior[i,j])/( 2*(tp +posterior[i,j]) + fn+(1 - posterior[i,j] -posterior[n1+1,j]) +fp+(1-posterior[i,j]))
         if(f_new_match > f_score){
-          changed = TRUE
-          if(f_score -f_new_match >f_score_max_change){
-            f_score_max_change <- f_score -f_new_match
-          }
-          f_score = f_new_match
           
-          z[j] = i
+          # bipartite restriction
+          if((i %in% z[-j])){
+            j_prime = which(i==z)
+            # only compare to records before j
+            if(j_prime < j){
+              #compare
+              z1 =z
+              z1[j] = z[j_prime]
+              z1[j_prime] = z[j]
+              
+              tp <- calculate_tp(posterior,z1)
+              #calculate false negatives
+              fn <- calculate_fn(posterior,z1)
+              #calculate false positives
+              fp <- calculate_fp(posterior,z1)
+              
+              #f score for the swapped case
+              f_score1 <- 2*tp/(2*tp + fp + fn)
+              
+              
+              tp <- calculate_tp(posterior,z)
+              #calculate false negatives
+              fn <- calculate_fn(posterior,z)
+              #calculate false positives
+              fp <- calculate_fp(posterior,z)
+              
+              #f score for the non-swapped case
+              f_score2 <- 2*tp/(2*tp + fp + fn)
+              
+              if(f_score1 > f_score2){
+                temp = z[j]
+                z[j] = z[j_prime]
+                z[j_prime] = temp
+                changed= TRUE
+              }
+              else{
+                changed = FALSE
+              }
+
+            }
+          }
+          # no biparite restriction
+          else{
+          changed = TRUE
+            if(f_score -f_new_match >f_score_max_change){
+              f_score_max_change <- f_score -f_new_match
+            }
+            f_score = f_new_match
+            
+            z[j] = i
+          }
         }
       }
       #after this step i now is the match for j that maximizes the f score

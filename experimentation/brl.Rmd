@@ -1,0 +1,35 @@
+
+
+```{r}
+library("BRL")
+data(twoFiles)
+
+BRL()
+
+flds=c("gname", "fname", "age", "occup")
+types=c("lv","lv","bi","bi")
+
+myCompData <- compareRecords(df1, df2, flds, 
+    types)
+
+nIter = 1000
+
+chain <- bipartiteGibbs(myCompData, nIter=nIter, a = 1, b = 1, aBM = 1, bBM = 1, seed = 0)
+
+Zhat <- linkRecords(chain$Z, n1 = nrow(df1), lFNM = 1, 
+  lFM1 = 1, lFM2 = 2, lR = Inf)
+
+n1 <- nrow(df1)
+## the linked record pairs
+cbind( df1[Zhat[Zhat<=n1],], df2[Zhat<=n1,] )
+```
+
+```{r}
+myCompData$comparisons
+```
+
+
+```{r}
+chain$Z
+```
+

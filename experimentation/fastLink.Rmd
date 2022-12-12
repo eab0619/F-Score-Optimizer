@@ -1,0 +1,154 @@
+
+```{r}
+library(fastLink)
+data(samplematch)
+
+matches.out <- fastLink::fastLink(
+  dfA = dfA, dfB = dfB, 
+  varnames = c("firstname", "middlename", "lastname", "housenum", "streetname", "city", "birthyear"),
+  stringdist.match = c("firstname", "middlename", "lastname", "streetname", "city"),
+  partial.match = c("firstname", "lastname", "streetname")
+)
+```
+
+## Get table counts
+
+```{r}
+
+validateArgs.getComparisonData.fastLink <- function(dfA, dfB, varnames,
+                               stringdist.match = NULL, 
+                               stringdist.method = "jw",
+                               numeric.match = NULL, 
+                               partial.match = NULL,
+                               cut.a = 0.94, cut.p = 0.88,
+                               jw.weight = .10,
+                               cut.a.num = 1, cut.p.num = 2.5,
+                               n.cores = NULL) {
+      if(any(class(dfA) %in% c("tbl_df", "data.table"))){
+        dfA <- as.data.frame(dfA)
+    }
+    if(any(class(dfB) %in% c("tbl_df", "data.table"))){
+        dfB <- as.data.frame(dfB)
+    }
+    if(any(!(varnames %in% names(dfA)))){
+        stop("Some variables in varnames are not present in dfA.")
+    }
+    if(any(!(varnames %in% names(dfB)))){
+        stop("Some variables in varnames are not present in dfB.")
+    }
+    if(any(!(stringdist.match %in% varnames))){
+        stop("You have provided a variable name for stringdist.match that is not in 'varnames'.")
+    }
+    if(any(!(numeric.match %in% varnames))){
+        stop("You have provided a variable name for numeric.match that is not in 'varnames'.")
+    }
+    if(length(intersect(numeric.match, stringdist.match)) > 0){
+        stop("There is a variable present in both 'numeric.match' and 'stringdist.match'. Please select only one matching metric for each variable.")
+    }
+    if(is.null(numeric.match)) {
+      if (any(!(partial.match %in% varnames)) | any(!(partial.match %in% 
+                                                      stringdist.match))) {
+        stop("You have provided a variable name for 'partial.match' that is not present in either 'varnames', 'numeric.match', or 'stringdist.match'.")
+      }
+    } else {
+      if (any(!(partial.match %in% varnames)) | any(!(partial.match %in% unique(c(stringdist.match, numeric.match))))) {
+        stop("You have provided a variable name for 'partial.match' that is not present in either 'varnames', 'numeric.match', or 'stringdist.match'.")
+      }
+    }
+  
+    ## Check class of numeric indicators
+    classA <- lapply(dfA[,varnames], class)
+    classB <- lapply(dfB[,varnames], class)
+    if(any(unlist(classA)[names(classA) %in% numeric.match] != "numeric") |
+       any(unlist(classB)[names(classB) %in% numeric.match] != "numeric")){
+        stop("You have specified that a variable be compared using numeric matching, but that variable is not of class 'numeric'. Please check your variable classes.")
+    }
+}
+
+getComparisonData.fastLink <- function(dfA, dfB, varnames,
+                               stringdist.match = NULL, 
+                               stringdist.method = "jw",
+                               numeric.match = NULL, 
+                               partial.match = NULL,
+                               cut.a = 0.94, cut.p = 0.88,
+                               jw.weight = .10,
+                               cut.a.num = 1, cut.p.num = 2.5,
+                               n.cores = NULL){
+  
+    validateArgs.getComparisonData.fastLink(dfA, dfB, varnames,
+                               stringdist.match, 
+                               stringdist.method,
+                               numeric.match, 
+                               partial.match,
+                               cut.a, cut.p,
+                               jw.weight,
+                               cut.a.num, cut.p.num,
+                               n.cores)
+
+    ## Create boolean indicators
+    sm.bool <- which(varnames %in% stringdist.match)
+    stringdist.match <- rep(FALSE, length(varnames))
+    if(length(sm.bool) > 0){
+        stringdist.match[sm.bool] <- TRUE
+    }
+
+    nm.bool <- which(varnames %in% numeric.match)
+    numeric.match <- rep(FALSE, length(varnames))
+    if(length(nm.bool) > 0){
+        numeric.match[nm.bool] <- TRUE
+    }
+
+    pm.bool <- which(varnames %in% partial.match)
+    partial.match <- rep(FALSE, length(varnames))
+    if(length(pm.bool) > 0){
+        partial.match[pm.bool] <- TRUE
+    }
+
+    gammalist <- vector(mode = "list", length = length(varnames))
+    for(i in 1:length(gammalist)){
+        if(is.factor(dfA[,varnames[i]]) | is.factor(dfB[,varnames[i]])){
+            dfA[,varnames[i]] <- as.character(dfA[,varnames[i]])
+            dfB[,varnames[i]] <- as.character(dfB[,varnames[i]])
+        }
+        if(stringdist.match[i]){
+            if(partial.match[i]){
+                gammalist[[i]] <- gammaCKpar(
+                    dfA[,varnames[i]], dfB[,varnames[i]], cut.a = cut.a, cut.p = cut.p, method = stringdist.method, w = jw.weight, n.cores = n.cores
+                )
+            }else{
+                gammalist[[i]] <- gammaCK2par(dfA[,varnames[i]], dfB[,varnames[i]], cut.a = cut.a, method = stringdist.method, w = jw.weight, n.cores = n.cores)
+            }
+        }else if(numeric.match[i]){
+            if(partial.match[i]){
+                gammalist[[i]] <- gammaNUMCKpar(
+                    dfA[,varnames[i]], dfB[,varnames[i]], cut.a = cut.a.num, cut.p = cut.p.num, n.cores = n.cores
+                )
+            }else{
+                gammalist[[i]] <- gammaNUMCK2par(
+                    dfA[,varnames[i]], dfB[,varnames[i]], cut.a = cut.a.num, n.cores = n.cores
+                )
+            }
+        }else{
+            gammalist[[i]] <- gammaKpar(dfA[,varnames[i]], dfB[,varnames[i]], n.cores = n.cores)
+        }
+    }
+
+    nr_a <- nrow(dfA)
+    nr_b <- nrow(dfB)
+
+    counts <- tableCounts(gammalist, nobs.a = nr_a, nobs.b = nr_b, n.cores = n.cores)
+
+    return(counts)
+}
+```
+
+```{r}
+getComparisonData.fastLink(
+  dfA = dfA, dfB = dfB, 
+  varnames = c("firstname", "middlename", "lastname", "housenum", "streetname", "city", "birthyear"),
+  stringdist.match = c("firstname", "middlename", "lastname", "streetname", "city"),
+  partial.match = c("firstname", "lastname", "streetname")
+)
+```
+
+

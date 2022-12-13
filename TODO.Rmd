@@ -133,7 +133,34 @@ head(comparisonData)
 
 ### BRL's feature engineering
 
-TODO
+```{r}
+library(dplyr)
+library(BRL)
+data(twoFiles)
+
+# This needs to be checked
+getComparisonData.BRL <- function(df1, df2, flds, types) {
+  cd <- compareRecords(df1, df2, flds, types)
+  nDisagLevs = cd$nDisagLevs
+  comparisons = cd$comparisons
+  
+  table = t(t(comparisons) * as.vector(sapply(1:length(nDisagLevs), function(i) (1:nDisagLevs[i]) - 1)))
+  
+  cs = c(0, cumsum(nDisagLevs))
+
+  columns = sapply(1:length(nDisagLevs), function(i) {
+    return(rowSums(table[, (cs[i]+1):cs[i+1]]))
+  })
+  counts = data.frame(columns) %>% group_by_all() %>% count(name="count")
+  
+  colnames(counts) = c(paste0("gamma.", 1:length(nDisagLevs)), "count")
+  
+  return(counts %>% ungroup())
+}
+
+getComparisonData.BRL(df1, df2, flds=c("gname", "fname", "age", "occup"), types=c("lv","lv","bi","bi"))
+```
+
 
 ## Step 2: Modeling
 

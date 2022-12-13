@@ -521,7 +521,55 @@ comparisonData = getComparisonData.fastLink(
 </div>
 <div id="brls-feature-engineering" class="section level3">
 <h3>BRL’s feature engineering</h3>
-<p>TODO</p>
+<pre class="r"><code>library(dplyr)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;dplyr&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag</code></pre>
+<pre><code>## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union</code></pre>
+<pre class="r"><code>library(BRL)
+data(twoFiles)
+
+# This needs to be checked
+getComparisonData.BRL &lt;- function(df1, df2, flds, types) {
+  cd &lt;- compareRecords(df1, df2, flds, types)
+  nDisagLevs = cd$nDisagLevs
+  comparisons = cd$comparisons
+  
+  table = t(t(comparisons) * as.vector(sapply(1:length(nDisagLevs), function(i) (1:nDisagLevs[i]) - 1)))
+  
+  cs = c(0, cumsum(nDisagLevs))
+
+  columns = sapply(1:length(nDisagLevs), function(i) {
+    return(rowSums(table[, (cs[i]+1):cs[i+1]]))
+  })
+  counts = data.frame(columns) %&gt;% group_by_all() %&gt;% count(name=&quot;count&quot;)
+  
+  colnames(counts) = c(paste0(&quot;gamma.&quot;, 1:length(nDisagLevs)), &quot;count&quot;)
+  
+  return(counts %&gt;% ungroup())
+}
+
+getComparisonData.BRL(df1, df2, flds=c(&quot;gname&quot;, &quot;fname&quot;, &quot;age&quot;, &quot;occup&quot;), types=c(&quot;lv&quot;,&quot;lv&quot;,&quot;bi&quot;,&quot;bi&quot;))</code></pre>
+<pre><code>## Warning in compareRecords(df1, df2, flds, types): Argument &#39;flds&#39; was provided,
+## &#39;flds1&#39; is ignored</code></pre>
+<pre><code>## # A tibble: 53 × 5
+##    gamma.1 gamma.2 gamma.3 gamma.4 count
+##      &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt;   &lt;dbl&gt; &lt;int&gt;
+##  1       0       1       0       0     3
+##  2       0       1       0       3     2
+##  3       0       1       3       0     1
+##  4       0       1       3       3     2
+##  5       0       2       3       0     1
+##  6       0       2       3       3     1
+##  7       0       3       0       0    13
+##  8       0       3       0       3     5
+##  9       0       3       3       0     9
+## 10       0       3       3       3    11
+## # … with 43 more rows</code></pre>
 </div>
 </div>
 <div id="step-2-modeling" class="section level2">

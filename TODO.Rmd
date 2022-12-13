@@ -1,5 +1,9 @@
-
-# TODO: Things to code up
+---
+title: 'TODO: Things to code'
+output:
+  html_document:
+    code_folding: hide
+---
 
 This document outlines a few things that I think we should code up to make simulation studies easier to manage and scale up.
 

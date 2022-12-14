@@ -1,0 +1,663 @@
+---
+title: 'Simulation'
+author: "Eric Bai"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+---
+
+```{r setup, message=F, warning=F, echo=F}
+require(tidyverse)
+require(broom)
+require(patchwork)
+require(coda)
+require(RecordLinkage)
+require(BRL)
+require(caret)
+require(clue)
+require(MCMCpack)
+ggplot2::theme_set(ggplot2::theme_bw())
+knitr::opts_chunk$set(fig.align = 'center')
+```
+
+***
+
+## Full Function to Generate From Sadinle BRL
+
+
+```{r}
+require(RecordLinkage)
+require(BRL)
+require(caret)
+require(clue)
+require(MCMCpack)
+
+
+##Note this function requires running optimization.R to get the F Score algorithm
+
+simulate_BRL <- function(n1=1000, n2=50, 
+                         aBM=100, bBM=50,
+                         num_field=3,
+                         field_lvl=c(2,2,2),
+                         field_type=c("bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city"),
+                         m = list(c(1000, 1),
+                                  c(1000, 1),
+                                  c(1000,30)
+                         ),
+                         u = list(c(1000,5000),
+                                  c(1000,5000),
+                                  c(400,5000)
+                         ),
+                         
+                         num_chain=10000, burnin=1000,
+                         f_iteration=10000,B=1,
+                         seed=5)
+
+{
+  if(n2>n1){
+    stop("n2 must be smaller than n1") #check for file size restriction
+  }
+  set.seed(seed)
+  
+  #create index for data1 and data2
+  data1_index <- seq(1, n1)
+  data2_index <- seq(1, n2)
+  
+  #draw overlap from beta binomial
+  pi <- rbeta(1, aBM, bBM)
+  #get which records in file 2 link to records in file 1
+  overlap <- rbinom(n2, 1, pi)
+  overlap_size= sum(overlap)
+  
+  #randomly assign bipartite matching after
+  #obtaining which records in file 2 link
+  match_index = rep(n1+1, length(data2_index))
+  match_index[overlap==1] = sample(data1_index, sum(overlap), replace = F)
+  
+  #get final match dataframe
+  match_df = data.frame(data2_index = data2_index,
+                        true_index = match_index)
+  
+  #initialize comparision vector
+  comp_vec <- match_df %>% 
+    slice(rep(1:n(), each=n1)) %>% 
+    mutate(data1_index = rep(1:n1,n2)) %>%
+    mutate(match_ind = data1_index==true_index, id=row_number()) 
+  
+  
+  #id and comparison vectors for the matches
+  id = comp_vec %>% filter(match_ind==T) %>% pull(id)
+  combined_m = cbind(id)
+  
+  
+  
+  for(mu in m){
+    #draw m vector
+    mu_draw = MCMCpack::rdirichlet(1, mu)
+    #draw the comparison vectors given a match
+    col = rmultinom(overlap_size, 1, c(mu_draw)) %>% t()
+    combined_m = cbind(combined_m, col)
+  }
+  
+  #id and comparison vectors for the non-matches
+  id = comp_vec %>% filter(match_ind==F) %>% pull(id)
+  combined_u = cbind(id)
+  
+  
+  for(uu in u){
+    #draw u vector
+    u_draw = MCMCpack::rdirichlet(1, uu)
+    # sample the comparison vectors given its not a match
+    col = rmultinom(nrow(comp_vec) - overlap_size, 1, c(u_draw)) %>% t()
+    combined_u = cbind(combined_u, col)
+  }
+  
+  combined_total <- data.frame(rbind(combined_m, combined_u)) %>% arrange(id)
+  
+  
+  #set up Mauricio's Model
+  comp_final <- combined_total[,-1]==1
+  
+  file1 <- field_name
+  file2 <- field_name
+  types <- field_type
+  
+  nDisagLevs <- field_lvl
+  compFields <- data.frame(file1=file1, file2=file2, types= types)
+  
+  res <- list(comparisons = comp_final, n1 = n1, n2 = n2, nDisagLevs = nDisagLevs, 
+              compFields=compFields)
+  
+  
+  
+  chain <- BRL::bipartiteGibbs(cd = res, nIter = num_chain) #gibbs sampler BRL
+  chain_final <- chain$Z[, -c(1:burnin)] #toss out burn in
+  
+  overlap <- apply(chain_final, 2, function(x){sum(x<=n1)})
+  m_overlap <- mean(overlap)
+  interval <- quantile(overlap, c(0.025, 0.975)) #population size interval from Gibbs 
+  
+  #Bayes estimate from Sadinle
+  bayes <- linkRecords(chain_final, n1=n1)
+  bayes[bayes > n1+1] <- n1+1
+  
+  #induced bayes overlap
+  induced_bayes_overlap = sum(bayes<=n1)
+  
+  
+  ### F-Optim-Algo
+  
+  #clean posterior dataset
+  chain_final[chain_final > n1+1] <- n1+1
+  tableLabels <- apply(chain_final, 1, tabulate, nbins=max(chain_final))
+  tableLabels <- tableLabels/ncol(chain_final)
+  
+  #measure time take for F-Optim function
+  start.time <- Sys.time()
+  check <- optim_F(tableLabels, iteration=f_iteration, B=B) #uses optimization.R
+  end.time <- Sys.time()
+  time.taken <- round(end.time-start.time, 2)
+  print(paste0("The time taken for F-Score Optimizer is: ", time.taken))
+  
+  induced_f_overlap <- sum(check$z<=n1) #induced population size estimate from F 
+  #return(combined_total)
+  
+  final_dataset <- cbind(match_df,predicted_index = check$z, bayes_index= bayes,
+                         final_f = check$f_score) 
+  
+  
+  
+  #create table of metrics
+  miss_class_bayes = sum(final_dataset$true_index!=final_dataset$bayes_index)
+  true_recall_bayes = sum((final_dataset$true_index==final_dataset$bayes_index) & (final_dataset$bayes_index<=n1))/sum(final_dataset$true_index<=n1)
+  true_precision_bayes = sum((final_dataset$true_index==final_dataset$bayes_index) & (final_dataset$bayes_index<=n1))/sum(final_dataset$bayes_index<=n1)
+  true_f_bayes = (1+B^2) *true_precision_bayes * true_recall_bayes/( (B^2*true_precision_bayes) + true_recall_bayes)
+  
+  tp_b <- calculate_tp(tableLabels, bayes)
+  fn_b <- calculate_fn(tableLabels, bayes)
+  fp_b <- calculate_fp(tableLabels, bayes)
+  
+  pred_recall_b = tp_b/(tp_b+fn_b)
+  pred_precision_b =tp_b/(tp_b+fp_b)
+  pred_f_b = (1+B^2)*tp_b/((1+B^2)*tp_b + (B^2)*fn_b + fp_b)
+  
+  
+  
+  miss_class_f = sum(final_dataset$true_index!=final_dataset$predicted_index)
+  true_recall_f = sum((final_dataset$true_index==final_dataset$predicted_index) & (final_dataset$predicted_index<=n1))/sum(final_dataset$true_index<=n1)
+  true_precision_f = sum((final_dataset$true_index==final_dataset$predicted_index) & (final_dataset$predicted_index<=n1))/sum(final_dataset$predicted_index<=n1)
+  true_f_f = (1+B^2) *true_precision_f * true_recall_f/( (B^2*true_precision_f) + true_recall_f)
+  
+  
+  tp_f <- calculate_tp(tableLabels,check$z)
+  fn_f <- calculate_fn(tableLabels,check$z)
+  fp_f <- calculate_fp(tableLabels,check$z)
+  
+  
+  pred_recall_f = tp_f/(tp_f+fn_f)
+  pred_precision_f =tp_f/(tp_f+fp_f)
+  pred_f_f = (1+B^2)*tp_f/((1+B^2)*tp_f + (B^2)*fn_f + fp_f)
+  
+  performance_vec <- c(miss_class_bayes,miss_class_f, true_recall_bayes,true_recall_f,
+                       true_precision_bayes,true_precision_f,true_f_bayes,
+                       true_f_f,
+                       pred_recall_b,pred_recall_f,pred_precision_b,pred_precision_f
+                       ,pred_f_b,pred_f_f,interval, sum(final_dataset$true_index<=n1), induced_bayes_overlap,induced_f_overlap)
+  names(performance_vec) <- c("Misclassification Bayes", "Misclassification F_Algo",
+                              "True Recall Bayes","True Recall F_Algo",
+                              "True Precision Bayes","True Precision F_Algo",
+                              "True F Bayes",
+                              "True F F_Algo",
+                              "Pred Recall Bayes", "Pred Recall F_Algo", 
+                              "Pred Precision Bayes","Pred Precision F_Algo", 
+                              "Pred F Bayes","Pred F F_Algo", c("lower","upper"),
+                              "actual_overlap",
+                              "induced_bayes_overlap", "induced_f_overlap")
+  
+  return(list(comparision_data = combined_total, data=final_dataset,f=performance_vec, chain=chain_final, post=tableLabels))
+}
+```
+
+## Simulation Examples
+
+### Corner Case
+
+This is the case where we have super low overlap < 10% as a percentage of file size in dataset2, very small homonomy rate and very small variation rate. The closed form Bayes solution outperforms the F Score Optimizer. Note that the actual overlap is actually below the 95 posterior interval for the estimated overlap from the Gibbs. This implies that the model may be an ill fit to these kinds of problems. Also, most problems we wouldn't expect the number of overlaps as a percentage of file size 2 to be less than 10%.
+
+```{r}
+testing <- simulate_BRL(m = list(c(4950, 50),
+                                  c(4950, 50),
+                                  c(4950,50)
+                                  ),
+                         u = list(c(50,4950),
+                                  c(50,4950),
+                                  c(50,4950)
+                                  ),
+                        B=1,
+                        aBM = 10, bBM = 100,
+                        n1=500, n2=500
+                        )
+```
+
+### Case 2: Moderate Noise
+In the following simulation, we can think of this case as low variation rate and a moderate homonomy rate.The overlap as percentage of data file 2 is 66%.
+
+```{r}
+testing <- simulate_BRL(m = list(c(5000, 0),
+                                  c(5000, 0),
+                                  c(4950,50)
+                                  ),
+                         u = list(c(500,4500),
+                                  c(500,4500),
+                                  c(300,4970)
+                                  ),
+                        B=1
+                        )
+```
+
+### Moderate Noise with 4 Fields
+
+The situation below is the case when there is moderate amounts of homonomy and moderate amounts of varation rates. We know extend the fields to 4.
+
+```{r}
+testing <- simulate_BRL(field_lvl=c(2,2,2,2),
+                         field_type=c("bi", "bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city",
+                                        "age"),
+                         m = list(c(3000, 2000),
+                                  c(3000, 2000),
+                                  c(4900,100),
+                                  c(5000,0)
+                                  ),
+                         u = list(c(1000,4000),
+                                  c(1000,4000),
+                                  c(2000,3000),
+                                  c(100,4900)
+                                  ), seed=12,
+                        n1=1000, n2=50
+                        
+                        )
+```
+
+
+
+### Various Other Examples
+
+This example has moderate amounts of homonomy rate and variation rate.
+
+```{r}
+#example has LSAP conservative
+testing <- simulate_BRL(field_lvl=c(2,2,2,2),
+                         field_type=c("bi", "bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city",
+                                        "age"),
+                         m = list(c(3000, 2000),
+                                  c(3000, 2000),
+                                  c(4900,100),
+                                  c(5000,0)
+                                  ),
+                         u = list(c(1000,4000),
+                                  c(1000,4000),
+                                  c(2000,3000),
+                                  c(100,4900)
+                                  )
+                        )
+
+
+
+testing <- simulate_BRL(field_lvl=c(2,2,2,2),
+                         field_type=c("bi", "bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city",
+                                        "age"),
+                         m = list(c(3000, 2000),
+                                  c(3000, 2000),
+                                  c(4900,100),
+                                  c(5000,0)
+                                  ),
+                         u = list(c(2000,4000),
+                                  c(2000,4000),
+                                  c(2000,3000),
+                                  c(100,4900)
+                                  ),
+                        n1=10000, n2=50
+                        )
+
+
+
+testing <- simulate_BRL(field_lvl=c(2,2,2,2),
+                         field_type=c("bi", "bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city",
+                                        "age"),
+                         m = list(c(5000, 0),
+                                  c(3000, 2000),
+                                  c(4900,100),
+                                  c(5000,0)
+                                  ),
+                         u = list(c(1000,5000),
+                                  c(1000,4000),
+                                  c(2000,3000),
+                                  c(100,4900)
+                                  ),
+                        aBM=10, bBM=100,
+                        )
+
+testing <- simulate_BRL(field_lvl=c(4,4,2),
+                         field_type=c("lv", "lv", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city"),
+                         m = list(c(45000, 4900,100,1),
+                                  c(49000, 998,1,1),
+                                  c(49900,10)
+                                  ),
+                         u = list(c(1000,1000,10000,30000),
+                                  c(10000,10000,10000,30000),
+                                  c(15000,45000)
+                                  ))
+
+
+
+```
+
+
+
+
+
+```{r}
+testing <- simulate_BRL(m = list(c(5000, 2000),
+                                  c(5000, 2000),
+                                  c(5000,1000)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(300,5000)
+                                  ),
+                        B=1,
+                        )
+```
+
+#problematic LSAP
+
+```{r}
+testing <- simulate_BRL(m = list(c(5000, 1000),
+                                  c(5000, 1000),
+                                  c(5000,1000)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(1000,5000)
+                                  ),
+                        B=1,
+                        )
+
+
+
+testing <- simulate_BRL(m = list(c(5000, 1000),
+                                  c(5000, 100),
+                                  c(5000,1000)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(1000,5000)
+                                  ),
+                        B=1,
+                        )
+
+
+
+
+testing <- simulate_BRL(m = list(c(5000, 1000),
+                                  c(5000, 100),
+                                  c(5000,100)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(1000,5000)
+                                  ),
+                        B=1,
+                        )
+
+
+testing <- simulate_BRL(m = list(c(5000, 100),
+                                  c(5000, 100),
+                                  c(5000,100)
+                                  ),
+                         u = list(c(1000,5000),
+                                  c(100,5000),
+                                  c(1000,5000)
+                                  ),
+                        B=1,
+                        )
+
+
+
+```
+## problematic case with F score optimizer
+```{r}
+testing <- simulate_BRL(m = list(c(5000, 1000),
+                                  c(5000, 1000),
+                                  c(5000,1000)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(500,5000)
+                                  ),
+                        B=1,
+                        aBM = 10, bBM = 100,
+                        n1=500, n2=500
+                        )
+```
+
+
+
+
+
+
+```{r}
+testing <- simulate_BRL(m = list(c(5000, 100),
+                                  c(5000, 100),
+                                  c(5000,100)
+                                  ),
+                         u = list(c(500,5000),
+                                  c(500,5000),
+                                  c(300,5000)
+                                  ),
+                        B=1
+                        )
+```
+
+## need this
+```{r}
+testing <- simulate_BRL(field_lvl=c(4,4,2),
+                         field_type=c("lv", "lv", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city"),
+                         m = list(c(45000, 4900,100,1),
+                                  c(49000, 998,1,1),
+                                  c(49900,10)
+                                  ),
+                         u = list(c(1000,1000,10000,30000),
+                                  c(10000,10000,10000,30000),
+                                  c(15000,45000)
+                                  ))
+```
+
+
+
+
+
+```{r}
+testing <- simulate_BRL(field_lvl=c(4,4,2),
+                         field_type=c("lv", "lv", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city"),
+                         m = list(c(45000, 4900,100,1),
+                                  c(49000, 998,1,1),
+                                  c(49900,10)
+                                  ),
+                         u = list(c(10000,10000,10,30000),
+                                  c(10000,10000,10,30000),
+                                  c(25000,25000)
+                                  ))
+```
+
+
+
+## Simulate from Sadinle BRL
+
+
+```{r}
+set.seed(5)
+n1 = 100
+n2 = 50
+
+data1_index <- seq(1, n1)
+data2_index <- seq(1, n2)
+
+pi <- rbeta(1, 1, 1)
+overlap <- rbinom(n2, 1, pi)
+overlap_size= sum(overlap)
+
+match_index = rep(n1+1, length(data2_index))
+
+match_index[overlap==1] = sample(data1_index, sum(overlap), replace = F)
+
+match_df = data.frame(data2_index = data2_index,
+                      true_index =match_index)
+
+comp_vec <- match_df %>% 
+  slice(rep(1:n(), each=n1)) %>% 
+  mutate(data1_index = rep(1:n1,n2)) %>%
+  mutate(match_ind = data1_index==true_index, id=row_number()) 
+
+```
+
+
+
+```{r}
+# sample from m and u
+set.seed(4)
+
+f = 3
+l = c(2, 2, 2)
+
+m_1 = MCMCpack::rdirichlet(1, c(1000, 0))
+m_2 = MCMCpack::rdirichlet(1, c(1000,0))
+m_3 = MCMCpack::rdirichlet(1, c(1000,30))
+
+u_1 = MCMCpack::rdirichlet(1, c(1000,5000))
+u_2 = MCMCpack::rdirichlet(1, c(1000,5000))
+u_3 = MCMCpack::rdirichlet(1, c(400,5000))
+
+```
+
+
+
+
+```{r}
+set.seed(4)
+
+id = comp_vec %>% filter(match_ind==T) %>% pull(id)
+#sample the comparison vectors for m
+col1 = rmultinom(overlap_size, 1, c(m_1)) %>% t()
+col2  = rmultinom(overlap_size, 1, c(m_2)) %>% t()
+col3 = rmultinom(overlap_size, 1, c(m_3)) %>% t()
+
+combined_m = cbind(id, col1, col2, col3)
+
+
+id = comp_vec %>% filter(match_ind==F) %>% pull(id)
+
+# sample the comparison vectors for u
+col1 = rmultinom(nrow(comp_vec) - overlap_size, 1, c(u_1)) %>% t()
+col2  = rmultinom(nrow(comp_vec) - overlap_size, 1, c(u_2)) %>% t()
+col3 = rmultinom(nrow(comp_vec) - overlap_size, 1, c(u_3)) %>% t()
+
+combined_u = cbind(id,col1, col2, col3)
+
+combined_total <- data.frame(rbind(combined_m, combined_u)) %>% arrange(id)
+
+```
+
+
+```{r}
+comp_final <- combined_total[,-1]==1
+```
+
+
+## set up additional fields for BRL Bipartite
+```{r}
+file1 <- c("fname", "lname", "city")
+file2 <- c("fname", "lname", "city")
+types <- c("bi", "bi", "bi")
+
+nDisagLevs <- c(2, 2, 2)
+compFields <- data.frame(file1=file1, file2=file2, types= types)
+
+res <- list(comparisons = comp_final, n1 = n1, n2 = n2, nDisagLevs = nDisagLevs, 
+            compFields=compFields)
+```
+
+
+
+## Run Bipartite
+```{r}
+
+chain <- BRL::bipartiteGibbs(cd = res, nIter = 10000)
+chain_final <- chain$Z[, -c(1:1000)]
+
+overlap <- apply(chain_final, 2, function(x){sum(x<=n1)})
+  interval <- quantile(overlap, c(0.025, 0.975))
+  
+  #Bayes estimate from Sadinle
+  bayes <- linkRecords(chain_final, n1=n1)
+  bayes[bayes > n1+1] <- n1+1
+  
+  induced_bayes_overlap = sum(bayes<=n1)
+  
+  
+  ### F-Optim-Algo
+  
+  #clean posterior dataset
+  chain_final[chain_final > n1+1] <- n1+1
+  tableLabels <- apply(chain_final, 1, tabulate, nbins=max(chain_final))
+  tableLabels <- tableLabels/ncol(chain_final)
+  
+  #measure time take for F-Optim function
+  start.time <- Sys.time()
+  check <- optim_F(tableLabels, iteration=10000, B=1)
+  end.time <- Sys.time()
+  time.taken <- round(end.time-start.time, 2)
+  print(paste0("The time taken for F-Score Optimizer is: ", time.taken))
+  
+  induced_f_overlap <- sum(check$z<=n1)
+
+```
+
+
+```{r}
+test <- cbind(match_df,check$z, bayes)
+```
+
+
+```{r}
+sum(test$true_index==test$`check$z`)
+sum(test$true_index==test$bayes)
+```
+
+
+
+

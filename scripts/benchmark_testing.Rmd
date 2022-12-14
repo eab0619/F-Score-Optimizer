@@ -1,0 +1,322 @@
+---
+title: 'Independent Study: Bayesian Record Linkage'
+author: "Eric Bai"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+  pdf_document: default
+---
+
+```{r setup, message=F, warning=F, echo=F}
+require(tidyverse)
+require(broom)
+require(patchwork)
+require(kableExtra)
+require(memisc)
+require(fabCI)
+require(bayesplot)
+require(coda)
+require(RecordLinkage)
+require(BRL)
+require(caret)
+require(clue)
+ggplot2::theme_set(ggplot2::theme_bw())
+knitr::opts_chunk$set(fig.align = 'center')
+```
+
+***
+## Introduction
+
+
+## RL Testing
+```{r}
+#load the bipartite RL Data
+#load("RLdata_bipartite.RData")
+
+RLdata500_bipartite <- RLdata500_bipartite %>% mutate(file= case_when(file==1 ~ 2,
+                                                file==2 ~1))
+
+```
+
+
+```{r}
+data1 <- RLdata500_bipartite %>% filter(file==1) %>%
+  dplyr::select(-c(fname_c2, lname_c2, file, id))  %>%
+  mutate(across(c(by,bm,bd), as.numeric))
+
+data1_raw <- RLdata500_bipartite %>% filter(file==1) %>% 
+   dplyr::select(-c(fname_c2, lname_c2)) %>%
+  mutate(across(id, as.character)) %>% rownames_to_column(var="index")
+
+data2_raw <- RLdata500_bipartite %>% filter(file==2)%>% 
+  dplyr::select(-c(fname_c2, lname_c2)) %>%
+  mutate(across(id, as.character))
+  
+data2 <- RLdata500_bipartite %>% filter(file==2) %>%
+  dplyr::select(-c(fname_c2, lname_c2, file, id)) %>%
+  mutate(across(c(by,bm,bd), as.numeric))
+
+#get counts
+n1 <- nrow(data1)
+n2 <- nrow(data2)
+
+#get true index match for data2
+true_index <- data2_raw %>% left_join(data1_raw,by="id") %>% 
+  dplyr::select(index) 
+
+true_index[is.na(true_index)] <- n1+1
+
+```
+
+
+
+```{r}
+#make comparision vectors
+myCompData <- compareRecords(data1, data2, flds=c("fname_c1", "lname_c1", "by", "bm", "bd"), 
+                             types=c("lv","lv","nu","nu", "nu"))
+
+#run MCMC
+chain <- bipartiteGibbs(myCompData, 10000)
+
+#discard burn-in
+chain_final <- chain$Z[, -c(1:1000)]
+
+#Bayes estimate from Sadinle
+bayes <- linkRecords(chain_final, n1=nrow(data1))
+bayes[bayes > n1+1] <- n1+1
+```
+
+
+```{r}
+#clean posterior dataset
+chain_final[chain_final > n1+1] <- n1+1
+tableLabels <- apply(chain_final, 1, tabulate, nbins=max(chain_final))
+tableLabels <- tableLabels/ncol(chain_final)
+```
+
+```{r}
+check <- optim_F(tableLabels, iteration = 1)
+```
+
+
+```{r}
+#create datasets of results
+data2_matched <- data.frame(true_index = true_index$index, predicted_index=check$z, bayes_index = bayes)
+```
+
+## PatentsView Testing
+
+```{r, warning=FALSE}
+#must change working directory to data-raw
+#setwd("~/Library/Mobile Documents/com~apple~CloudDocs/Duke_MSS/Research/F-Score-Optimizer")
+#file name should be a tsv file
+#comp_var is the overlapping comparison variables as vector of strings
+#comp_type is the type of comparison for each variable as vector of strings ex: c("lv", "lv")
+create_results <- function(filename, comp_var, 
+                           comp_type, random_restart=F,
+                           num_chain=10000, burnin=1000,
+                           f_iteration=10000,
+                           B=1){
+  
+  comp_data <- read.csv(paste0("../data-raw/", filename), sep = "\t")
+  
+  #file 1 creation
+  data1 <- comp_data %>% filter(file=='A') %>% dplyr::select(all_of(comp_var))
+  #raw data to get index
+  data1_raw <- comp_data %>% filter(file=='A') %>% 
+    rownames_to_column(var="index") %>% mutate(row_count= nrow(.))
+  
+  #file 2 creation
+  data2 <- comp_data %>% filter(file=='B') %>% dplyr::select(all_of(comp_var))
+  data2_raw <- comp_data %>% filter(file=='B') 
+  
+  #get true index match for data2
+  true_index <- data2_raw %>% left_join(data1_raw,by="unique_id") %>% 
+    dplyr::select(index) 
+  
+  #get file sizes
+  n1 <- nrow(data1)
+  n2 <- nrow(data2)
+  
+  if(n2>n1){
+    stop("file B has more rows than file A!")
+  }
+  
+  true_index[is.na(true_index)] <- n1+1
+  
+  if(nrow(true_index) != n2){
+    stop("True index length does not match number of rows in file B, may have duplicates!")
+  }
+  
+  
+  ##### Sadinle's Method
+  
+  #make comparison vectors
+  myCompData <- compareRecords(data1, data2, flds=comp_var,
+                                types=comp_type)
+  #run MCMC
+  chain <- bipartiteGibbs(myCompData, num_chain)
+  #discard burn-in
+  chain_final <- chain$Z[, -c(1:burnin)]
+  
+  #obtain posterior for overlap size
+  overlap <- apply(chain_final, 2, function(x){sum(x<=n1)})
+  interval <- quantile(overlap, c(0.025, 0.975))
+  
+  #Bayes estimate from Sadinle
+  bayes <- linkRecords(chain_final, n1=nrow(data1))
+  bayes[bayes > n1+1] <- n1+1
+  
+  induced_bayes_overlap = sum(bayes<=n1)
+  
+  
+  ### F-Optim-Algo
+  
+  #clean posterior dataset
+  chain_final[chain_final > n1+1] <- n1+1
+  tableLabels <- apply(chain_final, 1, tabulate, nbins=max(chain_final))
+  tableLabels <- tableLabels/ncol(chain_final)
+  
+  #measure time take for F-Optim function
+  start.time <- Sys.time()
+  check <- optim_F(tableLabels, iteration=f_iteration, B=B)
+  end.time <- Sys.time()
+  time.taken <- round(end.time-start.time, 2)
+  print(paste0("The time taken for F-Score Optimizer is: ", time.taken))
+  
+  induced_f_overlap <- sum(check$z<=n1)
+  
+  
+  #create datasets of results
+  data2_matched <- cbind(data.frame(true_index = as.double(true_index$index), predicted_index=check$z, bayes_index = bayes, final_f = check$f_score), data2)
+  
+  #merge with data1 to get other informative variables
+  final_dataset <- data2_matched %>% merge(data1_raw, by.x="true_index", by.y="index", all.x=TRUE,suffixes = c("_2","_1"))
+  
+  #create table of metrics
+  miss_class_bayes = sum(data2_matched$true_index!=data2_matched$bayes_index)
+  true_recall_bayes = sum((data2_matched$true_index==data2_matched$bayes_index) & (data2_matched$bayes_index<=n1))/sum(data2_matched$true_index<=n1)
+  true_precision_bayes = sum((data2_matched$true_index==data2_matched$bayes_index) & (data2_matched$bayes_index<=n1))/sum(data2_matched$bayes_index<=n1)
+  true_f_bayes = (1+B^2) *true_precision_bayes * true_recall_bayes/((B^2*true_precision_bayes) + true_recall_bayes)
+  
+  tp_b <- calculate_tp(tableLabels, bayes)
+  fn_b <- calculate_fn(tableLabels, bayes)
+  fp_b <- calculate_fp(tableLabels, bayes)
+  
+  pred_recall_b = tp_b/(tp_b+fn_b)
+  pred_precision_b =tp_b/(tp_b+fp_b)
+  pred_f_b = (1+B^2)*tp_b/((1+B^2)*tp_b + (B^2)*fn_b + fp_b)
+  
+  
+  
+  miss_class_f = sum(data2_matched$true_index!=data2_matched$predicted_index)
+  true_recall_f = sum((data2_matched$true_index==data2_matched$predicted_index) & (data2_matched$predicted_index<=n1))/sum(data2_matched$true_index<=n1)
+  true_precision_f = sum((data2_matched$true_index==data2_matched$predicted_index) & (data2_matched$predicted_index<=n1))/sum(data2_matched$predicted_index<=n1)
+  true_f_f = (1+B^2) *true_precision_f * true_recall_f/( (B^2*true_precision_f) + true_recall_f)
+
+  tp_f <- calculate_tp(tableLabels,check$z)
+  fn_f <- calculate_fn(tableLabels,check$z)
+  fp_f <- calculate_fp(tableLabels,check$z)
+  
+  
+  pred_recall_f = tp_f/(tp_f+fn_f)
+  pred_precision_f =tp_f/(tp_f+fp_f)
+  pred_f_f = (1+B^2)*tp_f/((1+B^2)*tp_f + (B^2)*fn_f + fp_f)
+  
+  performance_vec <- c(miss_class_bayes,miss_class_f, true_recall_bayes,true_recall_f,
+                       true_precision_bayes,true_precision_f,true_f_bayes,
+                       true_f_f,
+                       pred_recall_b,pred_recall_f,pred_precision_b,pred_precision_f
+                       ,pred_f_b,pred_f_f,interval,sum(final_dataset$true_index<=n1), induced_bayes_overlap,induced_f_overlap)
+  names(performance_vec) <- c("Misclassification Bayes", "Misclassification F_Algo",
+                              "True Recall Bayes","True Recall F_Algo",
+                              "True Precision Bayes","True Precision F_Algo",
+                               "True F Bayes",
+                              "True F F_Algo",
+                              "Pred Recall Bayes", "Pred Recall F_Algo", 
+                              "Pred Precision Bayes","Pred Precision F_Algo", 
+                              "Pred F Bayes","Pred F F_Algo", c("lower","upper"),
+                              "actual_overlap",
+                              "induced_bayes_overlap", "induced_f_overlap")
+  
+  return(list(data=final_dataset,f=performance_vec, chain=chain_final,
+              post = tableLabels))
+  
+  }
+```
+
+
+```{r}
+isr_benchmark1 <- create_results("isr_benchmark-1.tsv", 
+                       c("name_first", "name_last"), 
+                       c("lv", "lv"))
+
+isr_benchmark2 <- create_results("isr_benchmark-2.tsv", 
+                       c("name_first", "name_last"), 
+                       c("lv", "lv"))
+
+isr_benchmark3 <- create_results("isr_benchmark-3.tsv", 
+                       c("name_first", "name_last", "city"), 
+                       c("lv", "lv", "lv"))
+
+isr_benchmark4 <- create_results("isr_benchmark-4.tsv", 
+                       c("name_first", "name_last"), 
+                       c("lv", "lv"))
+
+pv_benchmark1 <- create_results("pv_benchmark-1.tsv", 
+                       c("name_first", "name_last"), 
+                       c("lv", "lv"))
+```
+
+
+```{r}
+als_benchmark1 <- create_results("als_benchmark-1.tsv", 
+                       c("name_first", "name_last", "city"), 
+                       c("lv", "lv", "lv"), B =1)
+```
+
+
+
+```{r}
+comp_data <- read.csv(paste0("../data-raw/", "duplicate_test.tsv"), sep = "\t")
+  
+  #file 1 creation
+  data1 <- comp_data %>% filter(file=='A') %>% dplyr::select(all_of(comp_var))
+```
+
+
+
+```{r}
+
+dup_benchmark <- create_results("duplicate_test.tsv", 
+                       c("name_first", "name_last"), 
+                       c("lv", "lv"))
+
+```
+
+```{r}
+dup_benchmark[[1]] %>% filter(predicted_index<= max(row_count)) %>% group_by(predicted_index) %>% filter(n()>1)
+```
+
+
+```{r}
+combined <- rbind(isr_benchmark1[[2]],isr_benchmark2[[2]],isr_benchmark3[[2]], isr_benchmark4[[2]],pv_benchmark1[[2]]) %>% as.data.frame()
+
+```
+
+## Testing for LSAP
+```{r}
+
+
+test <- create_LSAP_Matrix(tableLabels, 1,1,2)
+
+test2 <- clue::solve_LSAP(t(test))
+
+test3 <- as.vector(test2)
+
+test3[test3>n1] = n1+1
+
+sum(isr_benchmark3$data$true_index != as.vector(test3))
+```
+
+
+

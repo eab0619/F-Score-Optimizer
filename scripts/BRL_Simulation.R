@@ -1,0 +1,192 @@
+require(RecordLinkage)
+require(BRL)
+require(caret)
+require(clue)
+require(MCMCpack)
+
+
+##Note this function requires running optimization.R to get the F Score algorithm
+
+simulate_BRL <- function(n1=1000, n2=50, 
+                         aBM=100, bBM=50,
+                         num_field=3,
+                         field_lvl=c(2,2,2),
+                         field_type=c("bi", "bi", "bi"),
+                         field_name = c("fname",
+                                        "lname",
+                                        "city"),
+                         m = list(c(1000, 1),
+                                  c(1000, 1),
+                                  c(1000,30)
+                         ),
+                         u = list(c(1000,5000),
+                                  c(1000,5000),
+                                  c(400,5000)
+                         ),
+                         
+                         num_chain=10000, burnin=1000,
+                         f_iteration=10000,B=1,
+                         seed=5)
+
+{
+  if(n2>n1){
+    stop("n2 must be smaller than n1") #check for file size restriction
+  }
+  set.seed(seed)
+  
+  #create index for data1 and data2
+  data1_index <- seq(1, n1)
+  data2_index <- seq(1, n2)
+  
+  #draw overlap from beta binomial
+  pi <- rbeta(1, aBM, bBM)
+  #get which records in file 2 link to records in file 1
+  overlap <- rbinom(n2, 1, pi)
+  overlap_size= sum(overlap)
+  
+  #randomly assign bipartite matching after
+  #obtaining which records in file 2 link
+  match_index = rep(n1+1, length(data2_index))
+  match_index[overlap==1] = sample(data1_index, sum(overlap), replace = F)
+  
+  #get final match dataframe
+  match_df = data.frame(data2_index = data2_index,
+                        true_index = match_index)
+  
+  #initialize comparision vector
+  comp_vec <- match_df %>% 
+    slice(rep(1:n(), each=n1)) %>% 
+    mutate(data1_index = rep(1:n1,n2)) %>%
+    mutate(match_ind = data1_index==true_index, id=row_number()) 
+  
+  
+  #id and comparison vectors for the matches
+  id = comp_vec %>% filter(match_ind==T) %>% pull(id)
+  combined_m = cbind(id)
+  
+  
+  
+  for(mu in m){
+    #draw m vector
+    mu_draw = MCMCpack::rdirichlet(1, mu)
+    #draw the comparison vectors given a match
+    col = rmultinom(overlap_size, 1, c(mu_draw)) %>% t()
+    combined_m = cbind(combined_m, col)
+  }
+  
+  #id and comparison vectors for the non-matches
+  id = comp_vec %>% filter(match_ind==F) %>% pull(id)
+  combined_u = cbind(id)
+  
+  
+  for(uu in u){
+    #draw u vector
+    u_draw = MCMCpack::rdirichlet(1, uu)
+    # sample the comparison vectors given its not a match
+    col = rmultinom(nrow(comp_vec) - overlap_size, 1, c(u_draw)) %>% t()
+    combined_u = cbind(combined_u, col)
+  }
+  
+  combined_total <- data.frame(rbind(combined_m, combined_u)) %>% arrange(id)
+  
+  
+  #set up Mauricio's Model
+  comp_final <- combined_total[,-1]==1
+  
+  file1 <- field_name
+  file2 <- field_name
+  types <- field_type
+  
+  nDisagLevs <- field_lvl
+  compFields <- data.frame(file1=file1, file2=file2, types= types)
+  
+  res <- list(comparisons = comp_final, n1 = n1, n2 = n2, nDisagLevs = nDisagLevs, 
+              compFields=compFields)
+  
+  
+  
+  chain <- BRL::bipartiteGibbs(cd = res, nIter = num_chain) #gibbs sampler BRL
+  chain_final <- chain$Z[, -c(1:burnin)] #toss out burn in
+  
+  overlap <- apply(chain_final, 2, function(x){sum(x<=n1)})
+  m_overlap <- mean(overlap)
+  interval <- quantile(overlap, c(0.025, 0.975)) #population size interval from Gibbs 
+  
+  #Bayes estimate from Sadinle
+  bayes <- linkRecords(chain_final, n1=n1)
+  bayes[bayes > n1+1] <- n1+1
+  
+  #induced bayes overlap
+  induced_bayes_overlap = sum(bayes<=n1)
+  
+  
+  ### F-Optim-Algo
+  
+  #clean posterior dataset
+  chain_final[chain_final > n1+1] <- n1+1
+  tableLabels <- apply(chain_final, 1, tabulate, nbins=max(chain_final))
+  tableLabels <- tableLabels/ncol(chain_final)
+  
+  #measure time take for F-Optim function
+  start.time <- Sys.time()
+  check <- optim_F(tableLabels, iteration=f_iteration, B=B) #uses optimization.R
+  end.time <- Sys.time()
+  time.taken <- round(end.time-start.time, 2)
+  print(paste0("The time taken for F-Score Optimizer is: ", time.taken))
+  
+  induced_f_overlap <- sum(check$z<=n1) #induced population size estimate from F 
+  #return(combined_total)
+  
+  final_dataset <- cbind(match_df,predicted_index = check$z, bayes_index= bayes,
+                         final_f = check$f_score) 
+  
+  
+  
+  #create table of metrics
+  miss_class_bayes = sum(final_dataset$true_index!=final_dataset$bayes_index)
+  true_recall_bayes = sum((final_dataset$true_index==final_dataset$bayes_index) & (final_dataset$bayes_index<=n1))/sum(final_dataset$true_index<=n1)
+  true_precision_bayes = sum((final_dataset$true_index==final_dataset$bayes_index) & (final_dataset$bayes_index<=n1))/sum(final_dataset$bayes_index<=n1)
+  true_f_bayes = (1+B^2) *true_precision_bayes * true_recall_bayes/( (B^2*true_precision_bayes) + true_recall_bayes)
+  
+  tp_b <- calculate_tp(tableLabels, bayes)
+  fn_b <- calculate_fn(tableLabels, bayes)
+  fp_b <- calculate_fp(tableLabels, bayes)
+  
+  pred_recall_b = tp_b/(tp_b+fn_b)
+  pred_precision_b =tp_b/(tp_b+fp_b)
+  pred_f_b = (1+B^2)*tp_b/((1+B^2)*tp_b + (B^2)*fn_b + fp_b)
+  
+  
+  
+  miss_class_f = sum(final_dataset$true_index!=final_dataset$predicted_index)
+  true_recall_f = sum((final_dataset$true_index==final_dataset$predicted_index) & (final_dataset$predicted_index<=n1))/sum(final_dataset$true_index<=n1)
+  true_precision_f = sum((final_dataset$true_index==final_dataset$predicted_index) & (final_dataset$predicted_index<=n1))/sum(final_dataset$predicted_index<=n1)
+  true_f_f = (1+B^2) *true_precision_f * true_recall_f/( (B^2*true_precision_f) + true_recall_f)
+  
+  
+  tp_f <- calculate_tp(tableLabels,check$z)
+  fn_f <- calculate_fn(tableLabels,check$z)
+  fp_f <- calculate_fp(tableLabels,check$z)
+  
+  
+  pred_recall_f = tp_f/(tp_f+fn_f)
+  pred_precision_f =tp_f/(tp_f+fp_f)
+  pred_f_f = (1+B^2)*tp_f/((1+B^2)*tp_f + (B^2)*fn_f + fp_f)
+  
+  performance_vec <- c(miss_class_bayes,miss_class_f, true_recall_bayes,true_recall_f,
+                       true_precision_bayes,true_precision_f,true_f_bayes,
+                       true_f_f,
+                       pred_recall_b,pred_recall_f,pred_precision_b,pred_precision_f
+                       ,pred_f_b,pred_f_f,interval, sum(final_dataset$true_index<=n1), induced_bayes_overlap,induced_f_overlap)
+  names(performance_vec) <- c("Misclassification Bayes", "Misclassification F_Algo",
+                              "True Recall Bayes","True Recall F_Algo",
+                              "True Precision Bayes","True Precision F_Algo",
+                              "True F Bayes",
+                              "True F F_Algo",
+                              "Pred Recall Bayes", "Pred Recall F_Algo", 
+                              "Pred Precision Bayes","Pred Precision F_Algo", 
+                              "Pred F Bayes","Pred F F_Algo", c("lower","upper"),
+                              "actual_overlap",
+                              "induced_bayes_overlap", "induced_f_overlap")
+  
+  return(list(comparision_data = combined_total, data=final_dataset,f=performance_vec, chain=chain_final, post=tableLabels))

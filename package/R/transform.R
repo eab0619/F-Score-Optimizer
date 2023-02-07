@@ -1,4 +1,3 @@
-
 #' @export
 bipartiteLinkageVector_from_bipartiteLinkageGraph <- function(graph, n1, n2) {
   edges = igraph::as_edgelist(graph)
@@ -15,9 +14,6 @@ bipartiteLinkageGraph_from_bipartiteLinkageVector <- function(Z, n1, n2) {
   
   return(igraph::graph_from_edgelist(edges))
 }
-
-
-
 
 #' @export
 adjacencyMatrix_from_bipartiteWeightsMatrix <- function(matrix, n1, n2) {

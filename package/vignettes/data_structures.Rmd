@@ -1,0 +1,204 @@
+---
+title: "Data Structures for Bipartite Record Linkage"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{data_structures}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+This vignette describes the various data structures used for bipartite record linkage, and how the **FScoreBRL** package can be used to validate and transform between representations.
+
+To get started, let's load the FScoreBRL package. Functions defining data structures are located in the "dataStructures.R" file of the package, and functions to transform between data representations are located in the "transform.R" file.
+
+```{r setup}
+library(FScoreBRL)
+```
+
+## Data Structures for a Single Linkage
+
+Given two lists of records $A$ and $B$, of sizes $n_1$ and $n_2$, respectively, **bipartite record linkage** is the task of linking each record in $A$ to at most one record in $B$. This corresponds to the assumption that there is duplication across $A$ and $B$, but not within them.
+
+Such a linkage, where elements $i \in A$ and $j \in B$ are either linked or not linked, can be represented using one of the following data structures:
+
+1. A **bipartite linkage vector** $Z$, where $Z_j = i$ if $j\in B$ is linked to $i\in A$, and $Z_j = n_1 + j$ otherwise.
+2. A **bipartite linkage graph**, which is a bipartite graph between $A$ and $B$ where the degree of each vertex is at most $1$.
+
+Here are examples of the two.
+
+### Bipartite Linkage Vector Example
+
+First consider, the following bipartite record linkage between $A$ and $B$:
+```
+   A      B
+  ---    ---
+
+   1 ──── 1
+
+   2 ──── 2
+
+   3   ┌─ 3
+       │
+   4 ──┘
+```
+
+This is represented as follows as a bipartite linkage vector:
+
+```{r}
+n1 <- 4
+n2 <- 3
+Z <- c(1, 2, 4)
+```
+
+You can check that a bipartite linkage vector is valid using the `isBipartiteLinkageVector()` function:
+
+```{r}
+isBipartiteLinkageVector(Z, n1, n2)
+```
+
+### Bipartite Linkage Graph
+
+The same bipartite record linkage as above can be represented as an `igraph` bipartite graph. In this case, however, we must give distinct labels to each vertex. Our convention is to index the elements of $B$ from $n_1+1$ to $n_1+n_2$ as follows:
+
+```
+   A      B
+  ---    ---
+
+   1 ──── 5
+
+   2 ──── 6
+
+   3   ┌─ 7
+       │
+   4 ──┘
+```
+
+This is coded below, where the `types` argument defins_env(pkg$package), force, all.names = TRUE) :
+  restarting interrupted promise evaluation
+2: In eapply(pkgload::ns_env(pknes membership to $A$ or $B$.
+
+```{r}
+graph <- igraph::graph.bipartite(
+  types=c(rep(TRUE, 4), rep(FALSE, 3)), 
+  edges = c(
+    c(1, 5),
+    c(2, 6),
+    c(4, 7)
+  ),
+  directed = FALSE
+)
+graph
+```
+
+You can check that a bipartite linkage graph is valid using the `isBipartiteLinkageGraph()` function:
+
+```{r}
+isBipartiteLinkageGraph(graph, n1, n2)
+```
+
+The graph representation of a bipartite record linkage has many convenient properties. For instance, you can easily recover the **sparse adjacency matrix** and operate on it using standard matrix functions.
+
+```{r}
+igraph::as_adjacency_matrix(graph)
+```
+
+
+### Transformations
+
+To transform from a bipartite linkage vector to a bipartite linkage graph, use `bipartiteLinkageGraph_from_bipartiteLinkageVector()`.
+
+```{r}
+bipartiteLinkageGraph_from_bipartiteLinkageVector(Z, n1, n2)
+```
+
+To transform from a bipartite linkage graph to a bipartite linkage vector, use `bipartiteLinkageVector_from_bipartiteLinkageGraph()`.
+
+```{r}
+bipartiteLinkageVector_from_bipartiteLinkageGraph(graph, n1, n2)
+```
+
+## Data Structures for Adjacency Matrices and Weighted Graphs
+
+In addition to singular linkages, we often need to keep track of quantities associated to bipartite record linkage such as match probabilities and loss-associated weights between pairs of records. That is, we want to store weights $w_{i,j} \in \mathbb{R}$ associated to pairs of records $i\in A$ and $j\in B$.
+
+Two data structures are used for this:
+
+1. A **bipartite weights matrix** $W = [w_{i,j}]$, where $i\in A$, $j\in B$. 
+2. A **bipartite weighted graph** with vertices labeled as belonging to one of $A$ or $B$, and weights between elements of $A$ and $B$.
+
+### Bipartite Weights Matrix Example
+
+Let's continue the following linkage example:
+```
+   A      B
+  ---    ---
+
+   1 ──── 1
+
+   2 ──── 2
+
+   3   ┌─ 3
+       │
+   4 ──┘
+```
+
+However, rather than considering binary linkage, some of the links are associated to probabilities rather than certain links:
+
+```{r}
+mat = Matrix::Matrix(c(
+  0.8, 0.2, 0.0,
+  0.0, 1.0, 0.0,
+  0.0, 0.0, 0.0,
+  0.0, 0.0, 1.0),
+  ncol=3,
+  byrow=TRUE)
+mat
+```
+
+
+### Bipartite Weighted Graph Example
+
+Similarly, we can represent this data as a weighted bipartite graph. For this, we need to give distinct labels to each vertex. As before, our convention is to index the elements of $B$ from $n_1+1$ to $n_1+n_2$ as follows:
+
+```
+   A      B
+  ---    ---
+
+   1 ──── 5
+
+   2 ──── 6
+
+   3   ┌─ 7
+       │
+   4 ──┘
+```
+
+```{r}
+graph <- igraph::graph.bipartite(
+  types=c(rep(TRUE, 4), rep(FALSE, 3)), 
+  edges = c(c(1, 5), c(1, 6), c(2,6), c(4,7)), directed = FALSE)
+igraph::E(graph)$weight = c(0.8, 0.2, 1, 1)
+
+igraph::as_adjacency_matrix(graph, attr="weight")
+```
+
+### Transformations
+
+Use `bipartiteWeightsMatrix_from_bipartiteWeightedGraph()` to transform from bipartite weighted graph to bipartite weights matrix:
+```{r}
+bipartiteWeightsMatrix_from_bipartiteWeightedGraph(graph, n1, n2)
+```
+
+Use `bipartiteWeightedGraph_from_bipartiteWeightsMatrix()` to transform from bipartite weighted matrix to bipartite weights graph:
+```{r}
+bipartiteWeightedGraph_from_bipartiteWeightsMatrix(mat, n1, n2)
+```
+
+

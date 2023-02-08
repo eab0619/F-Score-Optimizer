@@ -28,12 +28,12 @@ Given two lists of records $A$ and $B$, of sizes $n_1$ and $n_2$, respectively, 
 
 Such a linkage, where elements $i \in A$ and $j \in B$ are either linked or not linked, can be represented using one of the following data structures:
 
-1. A **bipartite linkage vector** $Z$, where $Z_j = i$ if $j\in B$ is linked to $i\in A$, and $Z_j = n_1 + j$ otherwise.
-2. A **bipartite linkage graph**, which is a bipartite graph between $A$ and $B$ where the degree of each vertex is at most $1$.
+1. A **bipartite linkage vector "`BRLVector`"** $Z$, where $Z_j = i$ if $j\in B$ is linked to $i\in A$, and $Z_j = n_1 + j$ otherwise.
+2. A **bipartite linkage graph "`linkageBigraph`"**, which is a bipartite graph between $A$ and $B$ where the degree of each vertex is at most $1$.
 
 Here are examples of the two.
 
-### Bipartite Linkage Vector Example
+### BRLVector Example
 
 First consider, the following bipartite record linkage between $A$ and $B$:
 ```
@@ -60,10 +60,10 @@ Z <- c(1, 2, 4)
 You can check that a bipartite linkage vector is valid using the `isBipartiteLinkageVector()` function:
 
 ```{r}
-isBipartiteLinkageVector(Z, n1, n2)
+isBRLVector(Z, n1, n2)
 ```
 
-### Bipartite Linkage Graph
+### LinkageBigraph Example
 
 The same bipartite record linkage as above can be represented as an `igraph` bipartite graph. In this case, however, we must give distinct labels to each vertex. Our convention is to index the elements of $B$ from $n_1+1$ to $n_1+n_2$ as follows:
 
@@ -95,10 +95,10 @@ graph <- igraph::graph.bipartite(
 graph
 ```
 
-You can check that a bipartite linkage graph is valid using the `isBipartiteLinkageGraph()` function:
+You can check that a bipartite linkage graph is valid using the `isLinkageBigraph()` function:
 
 ```{r}
-isBipartiteLinkageGraph(graph, n1, n2)
+isLinkageBigraph(graph, n1, n2)
 ```
 
 The graph representation of a bipartite record linkage has many convenient properties. For instance, you can easily recover the **sparse adjacency matrix** and operate on it using standard matrix functions.
@@ -113,18 +113,18 @@ igraph::as_adjacency_matrix(graph)
 To transform from a bipartite linkage vector to a bipartite linkage graph, use `bipartiteLinkageGraph_from_bipartiteLinkageVector()`.
 
 ```{r}
-bipartiteLinkageGraph_from_bipartiteLinkageVector(Z, n1, n2)
+linkageBigraph_from_BRLVector(Z, n1, n2)
 ```
 
 To transform from a bipartite linkage graph to a bipartite linkage vector, use `bipartiteLinkageVector_from_bipartiteLinkageGraph()`.
 
 ```{r}
-bipartiteLinkageVector_from_bipartiteLinkageGraph(graph, n1, n2)
+BRLVector_from_linkageBigraph(graph, n1, n2)
 ```
 Additionally, you can transform a bipartite linkage vector to a coreference matrix $C = [c_{i,j}]$, $i\in A$, $j\in B$, where $c_{i,j} = 1$ if record $i$ is linked to $j$ and $c_{i,j} = 0$ otherwise:
 
 ```{r}
-coreferenceMatrix_from_bipartiteLinkageVector(Z, n1, n2)
+weightsMatrix_from_BRLVector(Z, n1, n2)
 ```
 
 
@@ -134,8 +134,8 @@ In addition to singular linkages, we often need to keep track of quantities asso
 
 Two data structures are used for this:
 
-1. A **bipartite weights matrix** $W = [w_{i,j}]$, where $i\in A$, $j\in B$. 
-2. A **bipartite weighted graph** with vertices labeled as belonging to one of $A$ or $B$, and weights between elements of $A$ and $B$.
+1. A **bipartite weights matrix "`weightsMatrix`"** $W = [w_{i,j}]$, where $i\in A$, $j\in B$. 
+2. A **bipartite weighted graph "`weightedBigraph`"** with vertices labeled as belonging to one of $A$ or $B$, and weights between elements of $A$ and $B$.
 
 ### Bipartite Weights Matrix Example
 
@@ -153,7 +153,7 @@ Let's continue the following linkage example:
    4 ──┘
 ```
 
-However, rather than considering binary linkage, some of the links are associated to probabilities rather than certain links:
+However, rather than considering binary linkage, some of the links are associated to probabilities and vertices can have degree greater than one:
 
 ```{r}
 mat = Matrix::Matrix(c(
@@ -163,7 +163,8 @@ mat = Matrix::Matrix(c(
   0.0, 0.0, 1.0),
   ncol=3,
   byrow=TRUE)
-mat
+
+isWeightsMatrix(mat, n1, n2)
 ```
 
 
@@ -190,19 +191,23 @@ graph <- igraph::graph.bipartite(
   edges = c(c(1, 5), c(1, 6), c(2,6), c(4,7)), directed = FALSE)
 igraph::E(graph)$weight = c(0.8, 0.2, 1, 1)
 
-igraph::as_adjacency_matrix(graph, attr="weight")
+graph[]
+```
+
+```{r}
+isWeightedBigraph(graph, n1, n2)
 ```
 
 ### Transformations
 
 Use `bipartiteWeightsMatrix_from_bipartiteWeightedGraph()` to transform from bipartite weighted graph to bipartite weights matrix:
 ```{r}
-bipartiteWeightsMatrix_from_bipartiteWeightedGraph(graph, n1, n2)
+weightsMatrix_from_weightedBigraph(graph, n1, n2)
 ```
 
 Use `bipartiteWeightedGraph_from_bipartiteWeightsMatrix()` to transform from bipartite weighted matrix to bipartite weights graph:
 ```{r}
-bipartiteWeightedGraph_from_bipartiteWeightsMatrix(mat, n1, n2)
+weightedBigraph_from_weightsMatrix(mat, n1, n2)
 ```
 
 

@@ -17,11 +17,11 @@
 #' Z <- c(1, 2, 4)
 #' n1 <- 4
 #' n2 <- 3
-#' isBipartiteLinkageVector(Z, n1, n2)
+#' isBRLVector(Z, n1, n2)
 #' # Returns: TRUE
 #' 
 #' @export
-isBipartiteLinkageVector <- function(Z, n1, n2) {
+isBRLVector <- function(Z, n1, n2) {
   if (!is.numeric(Z)) {
     return(FALSE)
   }
@@ -53,7 +53,7 @@ isBipartiteLinkageVector <- function(Z, n1, n2) {
 #' graph <- igraph::graph.bipartite(types=c(rep(TRUE, 3), rep(FALSE, 2)), edges = c(1, 4), directed = FALSE)
 #' n1 <- 3
 #' n2 <- 2
-#' isBipartiteLinkageGraph(graph, n1, n2)
+#' isLinkageBigraph(graph, n1, n2)
 #' # Returns: TRUE
 #' 
 #' graph[]
@@ -67,7 +67,7 @@ isBipartiteLinkageVector <- function(Z, n1, n2) {
 #' # [5,] . . . . .
 #' 
 #' @export
-isBipartiteLinkageGraph <- function(graph, n1, n2) {
+isLinkageBigraph <- function(graph, n1, n2) {
   if (!igraph::is.bipartite(graph)) {
     return(FALSE)
   }
@@ -91,7 +91,7 @@ isBipartiteLinkageGraph <- function(graph, n1, n2) {
 
 #' Check that graph is a bipartite weighted graph.
 #' 
-#' A bipartite weighted graph is a bipartite graph with edge weights.
+#' A bipartite weighted graph is a bipartite weighted graph between lists of sizes `n1` and `n2`.
 #' 
 #' @param graph object check.
 #' @param n1 size of the first list of records.
@@ -104,7 +104,7 @@ isBipartiteLinkageGraph <- function(graph, n1, n2) {
 #' igraph::E(graph)$weight = c(1.5, 0.5)
 #' n1 <- 3
 #' n2 <- 2
-#' isBipartiteWeightedGraph(graph, n1, n2)
+#' isWeightedBigraph(graph, n1, n2)
 #' # Returns: TRUE
 #' 
 #' graph[]
@@ -117,7 +117,7 @@ isBipartiteLinkageGraph <- function(graph, n1, n2) {
 #' # [5,] .   . 0.5 .   .  
 #' 
 #' @export
-isBipartiteWeightedGraph <- function(graph, n1, n2) {
+isWeightedBigraph <- function(graph, n1, n2) {
   if (!igraph::is.bipartite(graph)) {
     return(FALSE)
   }
@@ -138,7 +138,7 @@ isBipartiteWeightedGraph <- function(graph, n1, n2) {
 
 #' Check that matrix represents weights between two record lists.
 #' 
-#' A bipartite weights matrix is a matrix with rows corresponding to the `n1` elements of a first list, and columns corresponding to the `n2` elements to the second list.
+#' A weights matrix is a matrix with rows corresponding to the `n1` elements of a first list, and columns corresponding to the `n2` elements to the second list.
 #' 
 #' @param matrix object check. Can be a sparse matrix.
 #' @param n1 size of the first list of records.
@@ -157,12 +157,12 @@ isBipartiteWeightedGraph <- function(graph, n1, n2) {
 #' 
 #' n1 <- 3
 #' n2 <- 2
-#' isBipartiteWeightsMatrix(matrix, n1, n2)
+#' isWeightsMatrix(matrix, n1, n2)
 #' # Returns: TRUE
 #' 
 #' @export
-isBipartiteWeightsMatrix <- function(matrix, n1, n2) {
-  if (!dim(matrix)[[1]] == n1 | !dim(matrix)[[2]] == n2) {
+isWeightsMatrix <- function(matrix, n1, n2) {
+  if (dim(matrix)[[1]] != n1 | dim(matrix)[[2]] != n2) {
     return(FALSE)
   }
   

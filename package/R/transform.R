@@ -1,5 +1,6 @@
 #' @export
-bipartiteLinkageVector_from_bipartiteLinkageGraph <- function(graph, n1, n2) {
+BRLVector_from_linkageBigraph <- function(graph, n1, n2) {
+  assert::assert(isLinkageBigraph(graph, n1, n2))
   edges = igraph::as_edgelist(graph)
   Z = n1 + (1:n2)
   Z[edges[, 2] - n1] = edges[, 1]
@@ -8,7 +9,8 @@ bipartiteLinkageVector_from_bipartiteLinkageGraph <- function(graph, n1, n2) {
 }
 
 #' @export
-bipartiteLinkageGraph_from_bipartiteLinkageVector <- function(Z, n1, n2) {
+linkageBigraph_from_BRLVector <- function(Z, n1, n2) {
+  assert::assert(isBRLVector(Z, n1, n2))
   I = Z <= n1
   edges = matrix(c(n1 + (1:n2)[I], Z[I]), ncol=2)
   
@@ -18,18 +20,18 @@ bipartiteLinkageGraph_from_bipartiteLinkageVector <- function(Z, n1, n2) {
 }
 
 #' @export
-coreferenceMatrix_from_bipartiteLinkageVector <- function(Z, n1, n2) {
-  assert::assert(isBipartiteLinkageVector(Z, n1, n2))
+weightsMatrix_from_BRLVector <- function(Z, n1, n2) {
+  assert::assert(isBRLVector(Z, n1, n2))
   
-  graph = bipartiteLinkageGraph_from_bipartiteLinkageVector(Z, n1, n2)
+  graph = linkageBigraph_from_BRLVector(Z, n1, n2)
   types = igraph::get.vertex.attribute(graph)$type
   
   return(graph[types, !types])
 }
 
 #' @export
-adjacencyMatrix_from_bipartiteWeightsMatrix <- function(matrix, n1, n2) {
-  assert::assert(isBipartiteWeightsMatrix(matrix, n1, n2))
+adjMatrix_from_weightsMatrix <- function(matrix, n1, n2) {
+  assert::assert(isWeightsMatrix(matrix, n1, n2))
   
   n = n1+n2
   adjMatrix = Matrix::Matrix(data=0, nrow=n, ncol=n)
@@ -40,17 +42,19 @@ adjacencyMatrix_from_bipartiteWeightsMatrix <- function(matrix, n1, n2) {
 }
 
 #' @export
-bipartiteWeightedGraph_from_bipartiteWeightsMatrix <- function(matrix, n1, n2) {
-  assert::assert(isBipartiteWeightsMatrix(matrix, n1, n2))
+weightedBigraph_from_weightsMatrix <- function(matrix, n1, n2) {
+  assert::assert(isWeightsMatrix(matrix, n1, n2))
 
-  adjMatrix = adjacencyMatrix_from_bipartiteWeightsMatrix(matrix, n1, n2)
-  
-  return(igraph::graph_from_adjacency_matrix(adjMatrix, mode="undirected", weighted=TRUE))
+  adjMatrix = adjMatrix_from_weightsMatrix(matrix, n1, n2)
+  graph = igraph::graph_from_adjacency_matrix(adjMatrix, mode="undirected", weighted=TRUE)
+  igraph::V(graph)$type = c(rep(TRUE, n1), rep(FALSE, n2))
+    
+  return(graph)
 }
 
 #' @export
-bipartiteWeightsMatrix_from_bipartiteWeightedGraph <- function(graph, n1, n2) {
-  assert::assert(isBipartiteWeightedGraph(graph, n1, n2))
+weightsMatrix_from_weightedBigraph <- function(graph, n1, n2) {
+  assert::assert(isWeightedBigraph(graph, n1, n2))
   
   types = igraph::get.vertex.attribute(graph)$type
   

@@ -80,9 +80,7 @@ The same bipartite record linkage as above can be represented as an `igraph` bip
    4 ──┘
 ```
 
-This is coded below, where the `types` argument defins_env(pkg$package), force, all.names = TRUE) :
-  restarting interrupted promise evaluation
-2: In eapply(pkgload::ns_env(pknes membership to $A$ or $B$.
+This is coded below, where the `types` argument defines membership to $A$ or $B$.
 
 ```{r}
 graph <- igraph::graph.bipartite(

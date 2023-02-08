@@ -10,9 +10,21 @@ bipartiteLinkageVector_from_bipartiteLinkageGraph <- function(graph, n1, n2) {
 #' @export
 bipartiteLinkageGraph_from_bipartiteLinkageVector <- function(Z, n1, n2) {
   I = Z <= n1
-  edges = matrix(c((1:n2)[I], Z[I]), ncol=2)
+  edges = matrix(c(n1 + (1:n2)[I], Z[I]), ncol=2)
   
-  return(igraph::graph_from_edgelist(edges))
+  graph = igraph::make_bipartite_graph(types=c(rep(TRUE, n1), rep(FALSE, n2)), edges=c(t(edges)))
+  
+  return(graph)
+}
+
+#' @export
+coreferenceMatrix_from_bipartiteLinkageVector <- function(Z, n1, n2) {
+  assert::assert(isBipartiteLinkageVector(Z, n1, n2))
+  
+  graph = bipartiteLinkageGraph_from_bipartiteLinkageVector(Z, n1, n2)
+  types = igraph::get.vertex.attribute(graph)$type
+  
+  return(graph[types, !types])
 }
 
 #' @export

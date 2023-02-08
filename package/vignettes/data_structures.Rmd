@@ -80,9 +80,7 @@ The same bipartite record linkage as above can be represented as an `igraph` bip
    4 ──┘
 ```
 
-This is coded below, where the `types` argument defins_env(pkg$package), force, all.names = TRUE) :
-  restarting interrupted promise evaluation
-2: In eapply(pkgload::ns_env(pknes membership to $A$ or $B$.
+This is coded below, where the `types` argument defines membership to $A$ or $B$.
 
 ```{r}
 graph <- igraph::graph.bipartite(
@@ -123,6 +121,12 @@ To transform from a bipartite linkage graph to a bipartite linkage vector, use `
 ```{r}
 bipartiteLinkageVector_from_bipartiteLinkageGraph(graph, n1, n2)
 ```
+Additionally, you can transform a bipartite linkage vector to a coreference matrix $C = [c_{i,j}]$, $i\in A$, $j\in B$, where $c_{i,j} = 1$ if record $i$ is linked to $j$ and $c_{i,j} = 0$ otherwise:
+
+```{r}
+coreferenceMatrix_from_bipartiteLinkageVector(Z, n1, n2)
+```
+
 
 ## Data Structures for Adjacency Matrices and Weighted Graphs
 

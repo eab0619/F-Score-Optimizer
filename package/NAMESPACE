@@ -2,6 +2,7 @@
 
 export(BRLVector_from_linkageBigraph)
 export(adjMatrix_from_weightsMatrix)
+export(deltaMatrix_from_BRLchain)
 export(deltaMatrix_from_list)
 export(deltaMatrix_from_probas)
 export(isBRLVector)

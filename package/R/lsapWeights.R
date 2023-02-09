@@ -1,4 +1,17 @@
 
+#' @export
+deltaMatrix_from_BRLchain <- function(Zchain, n1, n2, k, beta=1.0) {
+  sums = colSums(chains <= n1)
+  n_samples = dim(chains)[[2]]
+  vals = (1+beta**2) / (beta**2 * sums + k)
+  j = rep(1:n2, n_samples)
+  i = c(chains)
+  x = rep(vals, each=n2) / n_samples
+  I_sub = i <= n1
+  
+  return(Matrix::sparseMatrix(i=i[I_sub], j=j[I_sub], x=x[I_sub], dims=c(n1, n2), repr="T"))
+}
+
 #' Compute delta matrix from list of coreference matrices
 #' 
 #' 

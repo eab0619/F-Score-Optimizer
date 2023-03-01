@@ -1,11 +1,11 @@
 
 #' @export
 deltaMatrix_from_BRLchain <- function(Zchain, n1, n2, k, beta=1.0) {
-  sums = colSums(chains <= n1)
-  n_samples = dim(chains)[[2]]
+  sums = colSums(Zchain <= n1)
+  n_samples = dim(Zchain)[[2]]
   vals = (1+beta**2) / (beta**2 * sums + k)
   j = rep(1:n2, n_samples)
-  i = c(chains)
+  i = c(Zchain)
   x = rep(vals, each=n2) / n_samples
   I_sub = i <= n1
   

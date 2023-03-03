@@ -4,6 +4,7 @@ library(BRL)
 #sourcing helper functions
 source("scripts/lsap_helper.R")
 source("scripts/create_delta_helper.R")
+source("package/R/lsapWeights.R")
 
 
 
@@ -61,8 +62,9 @@ linkage_estimate <- function(type='BRL',chain,l_10 = 1, l_01 =1, l_11 =2, b=1) {
     }
     
     #outer maximization
-    #return(outer[[which.max(score)]])
-    return(list(score=score, links=outer))
+    return(outer[[which.max(score)]])
+    ###below is for testing purposes
+    #return(list(score=score, links=outer))
 
   }
   else{
@@ -83,13 +85,16 @@ test1 <- linkage_estimate(chain=testing$chain)
 
 #### testing F estimate
 test2 <- linkage_estimate(type="F", chain=testing$chain)
-test2_optim <- test2$links[[which.max(test2$score)]]
+#test2_optim <- test2$links[[which.max(test2$score)]]
 
-sum(test2_optim!=testing$data$true_index) #misclassification
-sum(test2_optim<=n1) #induced population size
+#sum(test2_optim!=testing$data$true_index) #misclassification
+#sum(test2_optim<=max(testing$chain)-1) #induced population size
 
 
 #################################### Testing code
+
+
+
 
 
 

@@ -2,9 +2,6 @@ library(clue)
 
 
 
-
-
-
 #lsap general function
 lsap <- function(delta, k=NULL){
   if(is.null(k)){

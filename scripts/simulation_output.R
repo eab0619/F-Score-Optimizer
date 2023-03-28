@@ -153,3 +153,5 @@ metrics <- apply(params, 1, function(x){metrics(x$estimates,x$scenario()$ground_
 param_names = expand.grid(scenario_name=names(scenarios), estimator_name=names(estimators), stringsAsFactors=FALSE)
 final_df <- data.frame(params,param_names, metrics = I(metrics)) %>% unnest_wider(metrics)
 
+metrics_df <- final_df
+

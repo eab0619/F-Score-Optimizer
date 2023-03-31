@@ -1,0 +1,37 @@
+
+
+```{r}
+library(tidyverse)
+load("../data-raw/metrics_df.RData")
+```
+
+```{r}
+metrics_df %>% 
+  select(-c(scenario, estimator, estimates)) %>% 
+  ggplot(aes(x=estimator_name)) +
+  geom_point(aes(y=f_score)) +
+  facet_wrap("scenario_name") +
+  theme_minimal()
+```
+
+```{r}
+metrics_df %>% 
+  select(-c(scenario, estimator, estimates)) %>% 
+  ggplot(aes(x=estimator_name)) +
+  geom_point(aes(y=p_r_ratio)) +
+  geom_hline(yintercept=1, linetype=2) +
+  facet_wrap("scenario_name") +
+  theme_minimal()
+```
+
+TODO:
+
+- Need to revise low, medium and high noise field definitions.
+- Trick for realistic scenarios: fit a model to real data and use the estimated parameters as the basis for the simulation. This is basically model-based bootstrap.
+
+Most important:
+
+- Let's do a real data analysis and then a simulation study based on this real data.
+
+
+

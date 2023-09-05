@@ -3,12 +3,19 @@ metrics <- function(predicted, actual,chain){
   tp = sum((actual==predicted) & 
              (predicted<=n1))
   
+  pred_pos = sum(predicted<=n1)
+  
   
   recall = tp/sum(actual<=n1)
   ## setting recall =0 when denominator is zero 
   recall = ifelse(is.nan(recall), 0, recall)
   
   precision = tp/sum(predicted<=n1)
+  
+  ##override precision if predict all non matches
+  if(pred_pos==0){
+    precision = 1
+  }
   ## setting precision =0 when denominator is zero 
   precision = ifelse(is.nan(precision), 0, precision)
   
@@ -19,7 +26,7 @@ metrics <- function(predicted, actual,chain){
   f_score = ifelse(is.nan(f_score), 0, f_score)
   
   ## creating ratio of precision and recall
-  ratio = ifelse(is.nan(precision/recall), 0,precision/recall)
+  ratio = ifelse(recall==0,Inf ,precision/recall)
   
   
   overlap <- apply(chain, 2, function(x){sum(x<=n1)})

@@ -1,82 +1,8 @@
+library(tidyverse)
+
 source("scripts/linkage_estimate.R")
 source("scripts/simulate.R")
 source("scripts/metrics.R")
-
-
-
-
-## list of scenarios
-## three types of noisy scenarios: Low, medium, high. Increasing noise level by field
-
-### Low noise
-
-#### 1) low noise in one field
-
-#### 2) low noise in two fields
-
-#### 3) low noise in three fields
-
-low <- simulate(m = list(c(50000, 2000),
-                                   c(50000, 2000),
-                                   c(50000,2000)),
-                          u = list(c(2000,50000),
-                                   c(2000,50000),
-                                   c(2000,50000)))
-
-
-
-
-### Moderate noise
-
-#### 1) Moderate noise in one field
-
-mod_one <- simulate(m = list(c(50000, 10000),
-                                 c(50000, 1000),
-                                 c(50000,1000)),
-                        u = list(c(10000,50000),
-                                 c(1000,50000),
-                                 c(1000,50000)))
-
-#### 2) Moderate noise in two fields
-mod_two <- simulate(m = list(c(50000, 10000),
-                                 c(50000, 10000),
-                                 c(50000,1000)),
-                        u = list(c(10000,50000),
-                                 c(10000,50000),
-                                 c(1000,50000)))
-
-#### 3) Moderate noise in three fields
-mod_three <- simulate(m = list(c(50000, 10000),
-                                   c(50000, 10000),
-                                   c(50000,10000)),
-                          u = list(c(10000,50000),
-                                   c(10000,50000),
-                                   c(10000,50000)))
-
-### High noise
-
-#### 1) High noise in one field
-
-high_one <- simulate(m = list(c(50000, 30000),
-                      c(50000, 1000),
-                      c(50000,1000)),
-             u = list(c(30000,50000),
-                      c(1000,50000),
-                      c(1000,50000)))
-#### 2) High noise in two fields
-high_two <- simulate(m = list(c(50000, 30000),
-                                  c(50000,30000),
-                                  c(50000,1000)),
-                         u = list(c(30000,50000),
-                                  c(30000,50000),
-                                  c(1000,50000)))
-#### 3) High noise in three fields
-high_three <- simulate(m = list(c(50000, 30000),
-                              c(50000,30000),
-                              c(50000,30000)),
-                     u = list(c(30000,50000),
-                              c(30000,50000),
-                              c(30000,50000)))
 
 
 
@@ -86,50 +12,81 @@ high_three <- simulate(m = list(c(50000, 30000),
 ### build the dataframe of scenarios/estimates/metrics
 
 
-scenarios <- list(low_noise = function() {simulate(m = list(c(50000, 1000),
-                                                            c(50000, 1000),
-                                                            c(50000,1000)),
-                                                   u = list(c(2000,50000),
-                                                            c(2000,50000),
-                                                            c(2000,50000)))},
-                  moderate_noise_one_field = function() {simulate(m = list(c(50000, 10000),
-                                                                           c(50000, 1000),
-                                                                           c(50000,1000)),
-                                                                  u = list(c(10000,50000),
-                                                                           c(1000,50000),
-                                                                           c(1000,50000)))},
-                  moderate_noise_two_field = function() {simulate(m = list(c(50000, 10000),
+scenarios <- list(low_moderate_25_perc_overlap = function() {simulate(m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=10000, bBM=30000)},
+                  low_moderate_50_perc_overlap = function() {simulate(m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=10000, bBM=10000)},
+                  low_moderate_75_perc_overlap = function() {simulate(m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=30000, bBM=10000)},
+                  low_moderate_100_perc_overlap = function() {simulate(m = list(c(70000, 5000),
+                                                                                c(70000, 5000),
+                                                                                c(50000,1000)),
+                                                                       u = list(c(5000,70000),
+                                                                                c(10000,70000),
+                                                                                c(5000,60000)), aBM=30000, bBM=1)},
+                  
+                  moderate_25_perc_overlap = function() {simulate(m = list(c(50000, 10000),
                                                                            c(50000, 10000),
                                                                            c(50000,1000)),
                                                                   u = list(c(10000,50000),
                                                                            c(10000,50000),
-                                                                           c(1000,50000)))},
-                  moderate_noise_three_field = function() {simulate(m = list(c(50000, 10000),
-                                                                             c(50000, 10000),
-                                                                             c(50000,10000)),
-                                                                    u = list(c(10000,50000),
-                                                                             c(10000,50000),
-                                                                             c(10000,50000)))},
+                                                                           c(1000,50000)), aBM=10000, bBM=30000)},
+                  moderate_50_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                           c(50000, 10000),
+                                                                           c(50000,1000)),
+                                                                  u = list(c(10000,50000),
+                                                                           c(10000,50000),
+                                                                           c(1000,50000)), aBM=10000, bBM=10000)},
+                  moderate_75_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                           c(50000, 10000),
+                                                                           c(50000,1000)),
+                                                                  u = list(c(10000,50000),
+                                                                           c(10000,50000),
+                                                                           c(1000,50000)), aBM=30000, bBM=10000)},
+                  moderate_100_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                            c(50000, 10000),
+                                                                            c(50000,1000)),
+                                                                   u = list(c(10000,50000),
+                                                                            c(10000,50000),
+                                                                            c(1000,50000)), aBM=30000, bBM=1)},
                   
-                  high_noise_one_field = function() {simulate(m = list(c(50000, 30000),
-                                                                       c(50000, 1000),
-                                                                       c(50000,1000)),
-                                                              u = list(c(30000,50000),
-                                                                       c(1000,50000),
-                                                                       c(1000,50000)))},
-                  high_noise_two_field = function() {simulate(m = list(c(50000, 30000),
-                                                                       c(50000,30000),
-                                                                       c(50000,1000)),
-                                                              u = list(c(30000,50000),
-                                                                       c(30000,50000),
-                                                                       c(1000,50000)))},
-                  high_noise_three_field = function() {simulate(m = list(c(50000, 30000),
-                                                                         c(50000,30000),
-                                                                         c(50000,30000)),
-                                                                u = list(c(30000,50000),
-                                                                         c(30000,50000),
-                                                                         c(30000,50000)))}
-                  )
+                  high_25_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=10000, bBM=30000)},
+                  high_50_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=30000, bBM=30000)},
+                  high_75_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=30000, bBM=10000)},
+                  high_100_perc_overlap = function() {simulate(m = list(c(50000, 10000),
+                                                                        c(50000, 10000),
+                                                                        c(70000,30000)),
+                                                               u = list(c(10000,50000),
+                                                                        c(10000,50000),
+                                                                        c(1000,50000)), aBM=30000, bBM=1)}
+)
 
 #build list of eistimator functions
 estimators <- list(BRL=function(chain) {linkage_estimate(type="BRL", chain)},
@@ -155,3 +112,8 @@ final_df <- data.frame(params,param_names, metrics = I(metrics)) %>% unnest_wide
 
 metrics_df <- final_df
 
+#metrics_df %>% pivot_wider(id_cols = c(estimator_name), names_from = scenario_name, values_from= c(f_score, p_r_ratio)) %>% View()
+
+
+#metrics_df %>% select(scenario_name, estimator_name, f_score) %>% arrange(desc(scenario_name)) %>% 
+#  pivot_wider(names_from=c(scenario_name), values_from = c(f_score))

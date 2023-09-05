@@ -28,6 +28,12 @@ create_LSAP_Matrix <- function(posterior,l_10, l_01, l_11){
   return(lsap)
 }
 
+BRL_LSAP <- function(posterior,l_10=1, l_01=1, l_11=2){
+  lsap_matrix <- create_LSAP_Matrix(posterior = posterior, l_10=l10, l_01= l_01, l_11=l_11)
+  res <- clue::solve_LSAP(t(lsap_matrix))
+  return(as.vector(test2))
+}
+
 
 
 

@@ -1,25 +1,24 @@
 #' @import RecordLinkage BRL caret clue MCMCpack dplyr
 #' @export
-simulate_BRL <- function(n1=1000, n2=50, 
-                         aBM=100, bBM=50,
-                         num_field=3,
-                         field_lvl=c(2,2,2),
-                         field_type=c("bi", "bi", "bi"),
-                         field_name = c("fname",
-                                        "lname",
-                                        "city"),
-                         m = list(c(1000, 1),
-                                  c(1000, 1),
-                                  c(1000,30)
-                         ),
-                         u = list(c(1000,5000),
-                                  c(1000,5000),
-                                  c(400,5000)
-                         ),
-                         
-                         num_chain=10000, burnin=1000,
-                         B=1,
-                         seed=5)
+simulate <- function(n1=1000, n2=50, 
+                     aBM=1000, bBM=200,
+                     num_field=3,
+                     field_lvl=c(2,2,2),
+                     field_type=c("bi", "bi", "bi"),
+                     field_name = c("fname",
+                                    "lname",
+                                    "city"),
+                     m = list(c(1000, 1),
+                              c(1000, 1),
+                              c(1000,30)
+                     ),
+                     u = list(c(1000,5000),
+                              c(1000,5000),
+                              c(400,5000)
+                     ),
+                     num_chain=10000, burnin=1000,
+                     seed=5)
+
 {
   if(n2>n1){
     stop("n2 must be smaller than n1") #check for file size restriction
@@ -51,9 +50,12 @@ simulate_BRL <- function(n1=1000, n2=50,
     mutate(data1_index = rep(1:n1,n2)) %>%
     mutate(match_ind = data1_index==true_index, id=row_number()) 
   
+  
   #id and comparison vectors for the matches
   id = comp_vec %>% filter(match_ind==T) %>% pull(id)
   combined_m = cbind(id)
+  
+  
   
   for(mu in m){
     #draw m vector
@@ -67,6 +69,7 @@ simulate_BRL <- function(n1=1000, n2=50,
   id = comp_vec %>% filter(match_ind==F) %>% pull(id)
   combined_u = cbind(id)
   
+  
   for(uu in u){
     #draw u vector
     u_draw = MCMCpack::rdirichlet(1, uu)
@@ -76,6 +79,7 @@ simulate_BRL <- function(n1=1000, n2=50,
   }
   
   combined_total <- data.frame(rbind(combined_m, combined_u)) %>% arrange(id)
+  comparison_vector <- cbind(combined_total,comp_vec %>% dplyr::select(data1_index, data2_index, true_index))
   
   #set up Mauricio's Model
   comp_final <- combined_total[,-1]==1
@@ -90,8 +94,13 @@ simulate_BRL <- function(n1=1000, n2=50,
   res <- list(comparisons = comp_final, n1 = n1, n2 = n2, nDisagLevs = nDisagLevs, 
               compFields=compFields)
   
+  
+  
   chain <- BRL::bipartiteGibbs(cd = res, nIter = num_chain) #gibbs sampler BRL
   chain_final <- chain$Z[, -c(1:burnin)] #toss out burn in
+  chain_final[chain_final > n1+1] <- n1+1 #standardize non links to have n1+1 index
   
-  return(chain_final)
+  
+  
+  return(list(chain= chain_final, comparison=comparison_vector, ground_truth =match_df$true_index))
 }

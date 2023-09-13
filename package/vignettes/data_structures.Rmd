@@ -84,7 +84,7 @@ This is coded below, where the `types` argument defines membership to $A$ or $B$
 
 ```{r}
 graph <- igraph::graph.bipartite(
-  types=c(rep(TRUE, 4), rep(FALSE, 3)), 
+  types = c(rep(TRUE, 4), rep(FALSE, 3)),
   edges = c(
     c(1, 5),
     c(2, 6),
@@ -156,13 +156,16 @@ Let's continue the following linkage example:
 However, rather than considering binary linkage, some of the links are associated to probabilities and vertices can have degree greater than one:
 
 ```{r}
-mat = Matrix::Matrix(c(
-  0.8, 0.2, 0.0,
-  0.0, 1.0, 0.0,
-  0.0, 0.0, 0.0,
-  0.0, 0.0, 1.0),
-  ncol=3,
-  byrow=TRUE)
+mat <- Matrix::Matrix(
+  c(
+    0.8, 0.2, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 0.0,
+    0.0, 0.0, 1.0
+  ),
+  ncol = 3,
+  byrow = TRUE
+)
 
 isWeightsMatrix(mat, n1, n2)
 ```
@@ -187,9 +190,10 @@ Similarly, we can represent this data as a weighted bipartite graph. For this, w
 
 ```{r}
 graph <- igraph::graph.bipartite(
-  types=c(rep(TRUE, 4), rep(FALSE, 3)), 
-  edges = c(c(1, 5), c(1, 6), c(2,6), c(4,7)), directed = FALSE)
-igraph::E(graph)$weight = c(0.8, 0.2, 1, 1)
+  types = c(rep(TRUE, 4), rep(FALSE, 3)),
+  edges = c(c(1, 5), c(1, 6), c(2, 6), c(4, 7)), directed = FALSE
+)
+igraph::E(graph)$weight <- c(0.8, 0.2, 1, 1)
 
 graph[]
 ```

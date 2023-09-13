@@ -5,7 +5,7 @@
 ##
 ## Targets:
 ## 		help:		Show this help message.
-##		env: 		Create or update conda environment "pv-evaluation"
+##		env: 		Create or update conda environment "f-score-optimizer"
 ENV?=f-score-optimizer
 
 .PHONY: help env

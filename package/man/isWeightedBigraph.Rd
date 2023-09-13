@@ -20,20 +20,20 @@ TRUE if \code{graph} is a bipartite weighted graph, FALSE otherwise.
 A bipartite weighted graph is a bipartite weighted graph between lists of sizes \code{n1} and \code{n2}.
 }
 \examples{
-graph <- igraph::graph.bipartite(types=c(rep(TRUE, 3), rep(FALSE, 2)), edges = c(1, 4, 3, 5), directed = FALSE)
-igraph::E(graph)$weight = c(1.5, 0.5)
+graph <- igraph::graph.bipartite(types = c(rep(TRUE, 3), rep(FALSE, 2)), edges = c(1, 4, 3, 5), directed = FALSE)
+igraph::E(graph)$weight <- c(1.5, 0.5)
 n1 <- 3
 n2 <- 2
 isWeightedBigraph(graph, n1, n2)
 # Returns: TRUE
 
 graph[]
-# 5 x 5 sparse Matrix of class "dgCMatrix"
-# 
-# [1,] .   . .   1.5 .  
-# [2,] .   . .   .   .  
+# 5 x 5 sparse Matrix of class 'dgCMatrix'
+#
+# [1,] .   . .   1.5 .
+# [2,] .   . .   .   .
 # [3,] .   . .   .   0.5
-# [4,] 1.5 . .   .   .  
-# [5,] .   . 0.5 .   .  
+# [4,] 1.5 . .   .   .
+# [5,] .   . 0.5 .   .
 
 }

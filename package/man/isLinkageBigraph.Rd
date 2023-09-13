@@ -20,7 +20,7 @@ TRUE if \code{graph} is a bipartite linkage graph, FALSE otherwise.
 A bipartite linkage graph is a bipartite graph with degrees at most 1.
 }
 \examples{
-graph <- igraph::graph.bipartite(types=c(rep(TRUE, 3), rep(FALSE, 2)), edges = c(1, 4), directed = FALSE)
+graph <- igraph::graph.bipartite(types = c(rep(TRUE, 3), rep(FALSE, 2)), edges = c(1, 4), directed = FALSE)
 n1 <- 3
 n2 <- 2
 isLinkageBigraph(graph, n1, n2)
@@ -28,8 +28,8 @@ isLinkageBigraph(graph, n1, n2)
 
 graph[]
 
-# 5 x 5 sparse Matrix of class "dgCMatrix"
-# 
+# 5 x 5 sparse Matrix of class 'dgCMatrix'
+#
 # [1,] . . . 1 .
 # [2,] . . . . .
 # [3,] . . . . .

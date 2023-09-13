@@ -1,0 +1,143 @@
+---
+title: "Simulation Study"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{simulation_study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+
+```{r}
+library(FScoreBRL)
+library(tidyverse)
+
+n1 = 1000
+n2 = 50
+
+scenarios <- list(low_moderate_25_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                      m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=10000, bBM=30000)},
+                  low_moderate_50_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                      m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=10000, bBM=10000)},
+                  low_moderate_75_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                      m = list(c(70000, 5000),
+                                                                               c(70000, 5000),
+                                                                               c(50000,1000)),
+                                                                      u = list(c(5000,70000),
+                                                                               c(10000,70000),
+                                                                               c(5000,60000)), aBM=30000, bBM=10000)},
+                  low_moderate_100_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                       m = list(c(70000, 5000),
+                                                                                c(70000, 5000),
+                                                                                c(50000,1000)),
+                                                                       u = list(c(5000,70000),
+                                                                                c(10000,70000),
+                                                                                c(5000,60000)), aBM=30000, bBM=1)},
+                  
+                  moderate_25_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                  m = list(c(50000, 10000),
+                                                                           c(50000, 10000),
+                                                                           c(50000,1000)),
+                                                                  u = list(c(10000,50000),
+                                                                           c(10000,50000),
+                                                                           c(1000,50000)), aBM=10000, bBM=30000)},
+                  moderate_50_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                  m = list(c(50000, 10000),
+                                                                           c(50000, 10000),
+                                                                           c(50000,1000)),
+                                                                  u = list(c(10000,50000),
+                                                                           c(10000,50000),
+                                                                           c(1000,50000)), aBM=10000, bBM=10000)},
+                  moderate_75_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                  m = list(c(50000, 10000),
+                                                                           c(50000, 10000),
+                                                                           c(50000,1000)),
+                                                                  u = list(c(10000,50000),
+                                                                           c(10000,50000),
+                                                                           c(1000,50000)), aBM=30000, bBM=10000)},
+                  moderate_100_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                                   m = list(c(50000, 10000),
+                                                                            c(50000, 10000),
+                                                                            c(50000,1000)),
+                                                                   u = list(c(10000,50000),
+                                                                            c(10000,50000),
+                                                                            c(1000,50000)), aBM=30000, bBM=1)},
+                  
+                  high_25_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                              m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=10000, bBM=30000)},
+                  high_50_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                              m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=30000, bBM=30000)},
+                  high_75_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                              m = list(c(50000, 10000),
+                                                                       c(50000, 10000),
+                                                                       c(70000,30000)),
+                                                              u = list(c(10000,50000),
+                                                                       c(10000,50000),
+                                                                       c(1000,50000)), aBM=30000, bBM=10000)},
+                  high_100_perc_overlap = function() {simulate(n1=n1, n2=n2, 
+                                                               m = list(c(50000, 10000),
+                                                                        c(50000, 10000),
+                                                                        c(70000,30000)),
+                                                               u = list(c(10000,50000),
+                                                                        c(10000,50000),
+                                                                        c(1000,50000)), aBM=30000, bBM=1)}
+)
+
+#build list of eistimator functions
+estimators <- list(BRL=function(chain) {linkage_estimate(type="BRL", chain, n1, n2)},
+                   F_Score=function(chain) {linkage_estimate(type="F", chain, n1, n2)}
+)
+
+#first expand grid
+params = expand.grid(scenario=scenarios, estimator = estimators, stringsAsFactors = FALSE)
+
+#apply to get link estimates per scenario per algorithm
+estimates = apply(params, 1, function(x){list(x$estimator(x$scenario()$chain))})
+```
+
+```{r}
+#cleaning step
+un_estimates <- unlist(estimates, recursive = F)
+params$estimates <- un_estimates
+
+# apply again to get metrics
+metrics_val <- apply(params, 1, function(x){metrics(x$estimates,x$scenario()$ground_truth,x$scenario()$chain, n1, n2)})
+
+#get final df
+param_names = expand.grid(scenario_name=names(scenarios), estimator_name=names(estimators), stringsAsFactors=FALSE)
+final_df <- data.frame(params,param_names, metrics = I(metrics_val)) %>% unnest_wider(metrics)
+
+metrics_df <- final_df
+```
+
+
+```{r}
+metrics_df
+```

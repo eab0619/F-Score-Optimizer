@@ -20,10 +20,10 @@ TRUE if \code{matrix} is a bipartite weights matrix, FALSE otherwise.
 A weights matrix is a matrix with rows corresponding to the \code{n1} elements of a first list, and columns corresponding to the \code{n2} elements to the second list.
 }
 \examples{
-matrix <- Matrix::Matrix(c(0,1,0,0,1,0), nrow=3, byrow=TRUE)
+matrix <- Matrix::Matrix(c(0, 1, 0, 0, 1, 0), nrow = 3, byrow = TRUE)
 matrix
-# 3 x 2 sparse Matrix of class "dgCMatrix"
-# 
+# 3 x 2 sparse Matrix of class 'dgCMatrix'
+#
 # [1,] . 1
 # [2,] . .
 # [3,] 1 .

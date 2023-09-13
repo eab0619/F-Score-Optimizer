@@ -110,7 +110,7 @@ scenarios <- list(low_moderate_25_perc_overlap = function() {simulate(n1=n1, n2=
                                                                         c(1000,50000)), aBM=30000, bBM=1)}
 )
 
-#build list of eistimator functions
+build list of eistimator functions
 estimators <- list(BRL=function(chain) {linkage_estimate(type="BRL", chain, n1, n2)},
                    F_Score=function(chain) {linkage_estimate(type="F", chain, n1, n2)}
 )

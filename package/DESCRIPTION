@@ -12,6 +12,7 @@ Requires:
   igraph
   MatrixExtra
   RecordLinkage
+  tidyverse
 Suggests: 
     knitr,
     rmarkdown,

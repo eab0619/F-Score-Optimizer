@@ -15,7 +15,8 @@ knitr::opts_chunk$set(
 ```
 
 
-```{r}
+
+```{r} 
 library(FScoreBRL)
 library(tidyverse)
 
@@ -110,25 +111,27 @@ scenarios <- list(low_moderate_25_perc_overlap = function() {simulate(n1=n1, n2=
                                                                         c(1000,50000)), aBM=30000, bBM=1)}
 )
 
-build list of eistimator functions
 estimators <- list(BRL=function(chain) {linkage_estimate(type="BRL", chain, n1, n2)},
                    F_Score=function(chain) {linkage_estimate(type="F", chain, n1, n2)}
 )
 
 #first expand grid
 params = expand.grid(scenario=scenarios, estimator = estimators, stringsAsFactors = FALSE)
+params_row_list = split(params, seq(nrow(params)))
+ncores = parallel::detectCores()-1
 
 #apply to get link estimates per scenario per algorithm
-estimates = apply(params, 1, function(x){list(x$estimator(x$scenario()$chain))})
+estimates = parallel::mclapply(params_row_list, function(x){x$estimator[[1]](x$scenario[[1]]()$chain)}, mc.cores=ncores)
 ```
 
 ```{r}
 #cleaning step
-un_estimates <- unlist(estimates, recursive = F)
-params$estimates <- un_estimates
+#un_estimates <- unlist(estimates, recursive = F)
+params$estimates <- estimates
+params_row_list = split(params, seq(nrow(params)))
 
 # apply again to get metrics
-metrics_val <- apply(params, 1, function(x){metrics(x$estimates,x$scenario()$ground_truth,x$scenario()$chain, n1, n2)})
+metrics_val <- parallel::mclapply(params_row_list, function(x){metrics(x$estimates[[1]],x$scenario[[1]]()$ground_truth,x$scenario[[1]]()$chain, n1, n2)})
 
 #get final df
 param_names = expand.grid(scenario_name=names(scenarios), estimator_name=names(estimators), stringsAsFactors=FALSE)

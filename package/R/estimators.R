@@ -36,7 +36,6 @@ linkage_estimate <- function(type = "BRL", chain, n1, n2, l_10 = 1, l_01 = 1, l_
           res_score <- res_score + delta[result[j], j] # delta matrix contains scores
         }
       }
-
       score <- c(score, res_score) # append result score to score vector
       outer <- c(outer, list(result)) # append result to outer list
     }

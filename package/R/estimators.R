@@ -29,13 +29,9 @@ linkage_estimate <- function(type = "BRL", chain, n1, n2, l_10 = 1, l_01 = 1, l_
       result <- lsap(delta, k = k) # top k result
       result[result > n1] <- n1 + 1 # code all non matches to have n1 +1 index
 
-      res_score <- 0 # calculate score for result
-      for (j in 1:length(result)) {
-        if (result[j] <= n1) {
-          # if it is a match in dataset1
-          res_score <- res_score + delta[result[j], j] # delta matrix contains scores
-        }
-      }
+      valid_indices <- which(result <= n1)
+      res_score <- sum(delta[result[valid_indices], valid_indices])
+      
       score <- c(score, res_score) # append result score to score vector
       outer <- c(outer, list(result)) # append result to outer list
     }

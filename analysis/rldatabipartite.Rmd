@@ -1,0 +1,41 @@
+
+
+```{r}
+library(BRL)
+library(tidyverse)
+library(FScoreBRL)
+
+load("../data-raw/RLdata_bipartite.RData") # RLdata500_bipartite and RLdata10000_bipartite
+
+df1 = RLdata500_bipartite %>% filter(file==1)
+df2 = RLdata500_bipartite %>% filter(file==2)
+
+myCompData <- compareRecords(
+  df1, 
+  df2, 
+  flds=c("fname_c1", "lname_c1", "by"),
+  types=c("lv", "lv", rep("bi", 1))
+)
+Zchain <- bipartiteGibbs(myCompData, nIter=3000, seed=0)$Z[, 2500:3000]
+
+BRL_est = FScoreBRL::linkage_estimate(type="BRL", Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type="F", Zchain, nrow(df1), nrow(df2))
+
+all_ids = c(df1$id, df2$id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(252, nrow(df2))
+matched_indices = which(df2$id %in% dup_ids)
+actual[matched_indices] = match(df2$id[matched_indices], df1$id)
+
+F_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+
+print(F_metrics)
+print(BRL_metrics)
+```
+
+
+
+
+

@@ -56,7 +56,7 @@ create_Augmented_Weight_Matrix <- function(k, delta) {
   if (k == n2) {
     return(delta)
   } else {
-    aug <- matrix(10^2, nrow = n2 - k, ncol = n2)
+    aug <- matrix(n2, nrow = n2 - k, ncol = n2)
 
     lsap_aug <- rbind(delta, aug)
 

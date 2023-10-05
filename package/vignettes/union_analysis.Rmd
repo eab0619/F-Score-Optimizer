@@ -1,0 +1,113 @@
+
+
+```{r}
+library(readr)
+library(tidyverse)
+
+paste0_named = function(names, ...) setNames(paste0(...), names)
+
+union_cen = read_csv("../../data-raw/Union/cen_union_army_whites_csv.csv", cols(.default = "c"))
+colnames(union_cen) = union_cen[1,]
+CEN_wide = union_cen[2:nrow(union_cen), ]
+
+union_mil = read_csv("../../data-raw/Union/cmr_union_army_whites_csv.csv", cols(.default = "c"))
+colnames(union_mil) = union_mil[1,]
+MIL_wide = union_mil[2:nrow(union_mil), ]
+
+union_msr = read_csv("../../data-raw/Union/msr_union_army_whites_csv.csv", cols(.default = "c"))
+colnames(union_msr) = union_msr[1,]
+MSR_wide = union_msr[2:nrow(union_msr), ]
+
+union_cmr = read_csv("../../data-raw/Union/msr_union_army_whites_csv.csv", cols(.default = "c"))
+colnames(union_cmr) = union_cmr[1,]
+MSR_wide = union_cmr[2:nrow(union_cmr), ]
+
+```
+
+
+```{r}
+variable_stems = c(
+  name = "nam",
+  birth_year = "byr", # Only for 1900
+  birth_month = "bmo", # Only for 1900
+  gender = "gen",
+  birth_place = "bpl"
+)
+
+recruit_uid_variable = c(unique_id = "recidnum")
+recruit_variables_0 = paste0_named(names(variable_stems), "rec", variable_stems, "_0")
+fam_uid_variable = c(unique_id = NULL)
+fam_variables_0 = lapply(1:15, function(i) {
+  fam_number_id = formatC(i, width = 2, flag = "0")
+  paste0_named(names(variable_stems), "h", variable_stems, fam_number_id, "_0")
+})
+
+recruit_data = CEN_wide %>% select(!!!recruit_variables_0, !!!recruit_uid_variable)
+fam_data = lapply(1:15, function(i) {
+  df = CEN_wide %>% select(!!!fam_variables_0[[i]]) %>% mutate(unique_id = NA)
+})
+
+CEN = rbind(
+  recruit_data,
+  do.call(rbind, fam_data)
+) %>% 
+  drop_na(., starts_with("name")) %>%
+  extract(
+    name, 
+    into = c("last_name", "first_name", "middle_name", "comments"), 
+    regex = "\\s*(\\w+)\\s*,?\\s*(\\w+)(?:\\s*(\\w+))?\\s*(?:\\((.+)\\))?",
+    remove = FALSE
+  ) %>% 
+  mutate_if(is.character, ~na_if(., ''))
+```
+
+```{r}
+variables = c(
+  unique_id = "recidnum",
+  name = "recname1",
+  birth_date = "rb_date1",
+  birth_place = "rb_stat1",
+  enlistment_age = "lstag1_1",
+  enlistment_date = "lstdt1_1"
+)
+
+MSR = MSR_wide %>% 
+  select(!!!variables) %>% 
+  mutate(    
+    enlistment_year = case_when(
+      is.na(enlistment_date) ~ NA,
+      str_detect(substr(enlistment_date, 1, 4), "\\d{4}") ~ as.integer(substr(enlistment_date, 1, 4)),
+      TRUE ~ NA
+    ),
+    est_birth_year = enlistment_year - as.integer(enlistment_age) 
+  ) %>% 
+  mutate(
+    birth_year = case_when(
+      is.na(birth_date) | str_detect(birth_date, "^----") ~ NA,
+      TRUE ~ as.integer(substr(birth_date, 1, 4))
+    ),
+    birth_month = case_when(
+      is.na(birth_date) | str_detect(birth_date, "^.{4}--") ~ NA,
+      TRUE ~ as.integer(substr(birth_date, 5, 6))
+    ),
+    birth_day = case_when(
+      is.na(birth_date) | str_detect(birth_date, "--$") ~ NA,
+      TRUE ~ as.integer(substr(birth_date, 7, 8))
+    )
+  ) %>% 
+  mutate(
+    unified_birth_year = ifelse(is.na(birth_year), est_birth_year, birth_year)
+  ) %>% 
+  drop_na(., starts_with("name")) %>%
+  extract(
+    name, 
+    into = c("last_name", "first_name", "middle_name", "comments"), 
+    regex = "\\s*(\\w+)\\s*,?\\s*(\\w+)(?:\\s*(\\w+))?\\s*(?:\\((.+)\\))?",
+    remove = FALSE
+  ) %>% 
+  mutate_if(is.character, ~na_if(., ''))
+
+View(MSR)
+```
+
+

@@ -4,7 +4,7 @@ library(BRL)
 library(tidyverse)
 library(FScoreBRL)
 
-load("../data-raw/RLdata_bipartite.RData") # RLdata500_bipartite and RLdata10000_bipartite
+load("../../data-raw/RLdata_bipartite.RData") # RLdata500_bipartite and RLdata10000_bipartite
 
 data = RLdata500_bipartite %>% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
 

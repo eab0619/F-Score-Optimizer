@@ -112,7 +112,7 @@ MSR %>%
   group_by(birth_place) %>% 
   summarise(count=n()) %>% 
   arrange(-count) %>% 
-  tail(30) %>%
+  head(40) %>%
   ggplot(aes(x=count, y=birth_place)) +
   geom_bar(stat = "identity") +
   theme_minimal()
@@ -121,7 +121,7 @@ CEN %>%
   group_by(birth_place) %>% 
   summarise(count=n()) %>% 
   arrange(-count) %>% 
-  tail(30) %>%
+  head(40) %>%
   ggplot(aes(x=count, y=birth_place)) +
   geom_bar(stat = "identity") +
   theme_minimal()
@@ -135,61 +135,64 @@ library(BRL)
 library(tidyverse)
 library(FScoreBRL)
 
-df2 = MSR %>% 
+df1 = MSR %>% 
+  filter(birth_place=="NC") %>% 
   transmute(
     first_name = first_name, 
     last_name = last_name, 
     middle_name = middle_name, 
     birth_year = as.numeric(unified_birth_year),
-    birth_place = birth_place,
     unique_id
   ) %>% 
-  filter(birth_place=="TN") %>% 
-  head(100)
-df1 = CEN %>% 
+  head(20)
+df2 = CEN %>% 
+  filter(birth_place=="NC") %>% 
   transmute(
     first_name = first_name, 
     last_name = last_name, 
     middle_name = middle_name, 
     birth_year = as.numeric(birth_year),
-    birth_place = birth_place,
     unique_id = ifelse(is.na(unique_id), paste0("FAM_", 1:length(unique_id)), unique_id)
   ) %>% 
-  filter(birth_place=="TN") %>% 
-  head(100)
+  head(20)
 
-remove(MSR)
-remove(CEN)
+#remove(MSR)
+#remove(CEN)
 #remove(CNE_wide)
 #remove(MSR_wide)
+
+library(comparator)
+lev = Levenshtein(normalize=TRUE)
 
 myCompData <- compareRecords(
   df1, 
   df2, 
-  flds=c("first_name", "last_name", "middle_name", "birth_year"),
-  types=c(rep("lv", 2), rep("bi", 1), rep("bi", 1))
+  flds=c("first_name", "last_nsame"),
+  types=list(lev, lev),
+  breaks=c(0, 0.15, 1)
 )
-Zchain <- bipartiteGibbs(myCompData, nIter=1000, seed=0)$Z[, 1:1000]
+```
+
+
+
+```{r}
+Zchain <- bipartiteGibbs(myCompData, nIter=500, seed=0)$Z[, 0:500]
 
 BRL_est = FScoreBRL::linkage_estimate(type="BRL", Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type="F", Zchain, nrow(df1), nrow(df2))
 
 all_ids = c(df1$unique_id, df2$unique_id)
-dup_ids = all_ids[duplicated(all_ids)]
+dup_ids = all_ids[duplicated(all_ids)]ss
 
 actual = rep(nrow(df1) + 1, nrow(df2))
-matched_indices = which(df2$id %in% dup_ids)
-actual[matched_indices] = match(df2$id[matched_indices], df1$id)
+matched_indices = which(df2$unique_id %in% dup_ids)
+actual[matched_indices] = match(df2$unique_id[matched_indices], df1$unique_id)
 
 F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
 BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
-print("F_metrics")
-print(F_metrics)
-print("BRL_metrics")
-print(BRL_metrics)
-
 data.table::rbindlist(list(F_metrics, BRL_metrics))
+
 ```
 
 

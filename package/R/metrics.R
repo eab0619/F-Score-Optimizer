@@ -5,7 +5,7 @@ metrics <- function(predicted, actual, chain, n1, n2) {
   true_links_count <- sum(actual <= n1)
   
   precision <- ifelse(pred_links_count > 0, tp / pred_links_count, 1.0)
-  recall <- ifelse(true_links_count > 0, tp / true_links_count, 0.0)
+  recall <- ifelse(true_links_count > 0, tp / true_links_count, 1.0)
   f_score <- 2 * (precision * recall) / (precision + recall)
   
   p_r_ratio <- ifelse(recall == 0, Inf, precision / recall)

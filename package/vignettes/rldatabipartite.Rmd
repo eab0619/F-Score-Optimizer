@@ -41,12 +41,6 @@ data.table::rbindlist(list(F_metrics, BRL_metrics))
 ```
 
 ```{r}
-library(BRL)
-library(tidyverse)
-library(FScoreBRL)
-
-load("../data-raw/RLdata_bipartite.RData") # RLdata500_bipartite and RLdata10000_bipartite
-
 data = RLdata500_bipartite %>% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
 
 df1 = data %>% filter(file==1)
@@ -78,12 +72,6 @@ data.table::rbindlist(list(F_metrics, BRL_metrics))
 
 
 ```{r}
-library(BRL)
-library(tidyverse)
-library(FScoreBRL)
-
-load("../data-raw/RLdata_bipartite.RData") # RLdata500_bipartite and RLdata10000_bipartite
-
 data = RLdata500_bipartite %>% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
 
 df1 = data %>% filter(file==1)

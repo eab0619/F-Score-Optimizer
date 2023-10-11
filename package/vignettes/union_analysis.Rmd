@@ -111,23 +111,44 @@ MSR = MSR_wide %>%
 MSR %>% 
   group_by(birth_place) %>% 
   summarise(count=n()) %>% 
-  arrange(-count) %>% 
-  head(40) %>%
-  ggplot(aes(x=count, y=birth_place)) +
-  geom_bar(stat = "identity") +
-  theme_minimal()
+  arrange(-count)
 
-CEN %>% 
-  group_by(birth_place) %>% 
+MSR %>% 
+  group_by(lname_1 = substr(last_name, 1, 1)) %>% 
   summarise(count=n()) %>% 
-  arrange(-count) %>% 
-  head(40) %>%
-  ggplot(aes(x=count, y=birth_place)) +
-  geom_bar(stat = "identity") +
-  theme_minimal()
+  arrange(-count)
 ```
 
 ## Linkage
+
+```{r}
+library(comparator)
+
+compareRecords2 <- function(df1, df2, fields, comparators, breaks_list) {
+  bin_comps = lapply(1:length(fields), function(k) {
+    comparator = comparators[[k]]
+    field = fields[k]
+    breaks = breaks_list[[k]]
+    
+    dmat = comparator::pairwise(lev, df1[, field, drop=T], df2[, field, drop=T], return_matrix=TRUE)
+    comparisons = cut(dmat, breaks=breaks, labels=seq_len(length(breaks)-1))
+    I = 1:length(comparisons)
+    J = as.numeric(comparisons)
+    non_NAs = !is.na(J)
+    bin_comp = Matrix::sparseMatrix(i=I[non_NAs], j=J[non_NAs], x=TRUE, dims=c(length(comparisons), nlevels(comparisons)))
+    
+    return(bin_comp)
+  })
+  
+  return(list(
+    comparisons = as.matrix(do.call(cbind, bin_comps)),
+    n1 = nrow(df1),
+    n2 = nrow(df2),
+    nDisagLevs = sapply(bin_comps, ncol),
+    compFields = data.frame(file1=fields, file2=fields, types=sapply(comparators, class))
+  ))
+}
+```
 
 
 ```{r}
@@ -136,53 +157,64 @@ library(tidyverse)
 library(FScoreBRL)
 
 df1 = MSR %>% 
-  filter(birth_place=="NC") %>% 
   transmute(
     first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
     last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
     middle_name = middle_name, 
     birth_year = as.numeric(unified_birth_year),
-    unique_id
+    unique_id = str_remove(unique_id, "^0+"),
+    birth_place = birth_place
   ) %>% 
-  head(20)
+  mutate_if(is.character, ~na_if(., '')) %>% 
+  filter(birth_place=="MI")
+
 df2 = CEN %>% 
-  filter(birth_place=="NC") %>% 
   transmute(
     first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
     last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
     middle_name = middle_name, 
     birth_year = as.numeric(birth_year),
-    unique_id = ifelse(is.na(unique_id), paste0("FAM_", 1:length(unique_id)), unique_id)
+    unique_id = ifelse(is.na(unique_id), paste0("FAM_", 1:length(unique_id)), str_remove(unique_id, "^0+")),
+    birth_place = birth_place
   ) %>% 
-  head(20)
+  mutate_if(is.character, ~na_if(., '')) %>% 
+  filter(birth_place=="MI")
 
-#remove(MSR)
-#remove(CEN)
-#remove(CNE_wide)
-#remove(MSR_wide)
+if (nrow(df2) > nrow(df1)) {
+  temp = df1
+  df1 = df2
+  df2 = temp
+}
 
-library(comparator)
-lev = Levenshtein(normalize=TRUE)
+jaro = comparator::JaroWinkler(similarity=FALSE)
+lev = comparator::Levenshtein(normalize=TRUE)
+binary = comparator::BinaryComp()
+numeric = comparator::Manhattan()
 
-myCompData <- compareRecords(
-  df1, 
-  df2, 
-  flds=c("first_name", "last_nsame"),
-  types=list(lev, lev),
-  breaks=c(0, 0.15, 1)
+lev_breaks = c(-0.1, 0, 0.25, 0.5, 1.1)
+bin_breaks = c(-0.1, 0.5, 1.1)
+num_breaks = c(-1, 1, 5, 200)
+compData = compareRecords2(
+  df1,
+  df2,
+  fields = c("first_name", "last_name", "middle_name", "birth_year"),
+  comparators = list(lev, lev, binary, numeric),
+  breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
 )
-```
 
-
-
-```{r}
-Zchain <- bipartiteGibbs(myCompData, nIter=500, seed=0)$Z[, 0:500]
+Zchain <- bipartiteGibbs(compData, nIter=5000, seed=0)$Z[, 1000:5000]
 
 BRL_est = FScoreBRL::linkage_estimate(type="BRL", Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type="F", Zchain, nrow(df1), nrow(df2))
 
 all_ids = c(df1$unique_id, df2$unique_id)
-dup_ids = all_ids[duplicated(all_ids)]ss
+dup_ids = all_ids[duplicated(all_ids)]
 
 actual = rep(nrow(df1) + 1, nrow(df2))
 matched_indices = which(df2$unique_id %in% dup_ids)
@@ -192,7 +224,84 @@ F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
 BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))
-
 ```
+
+
+```{r}
+library(BRL)
+library(tidyverse)
+library(FScoreBRL)
+
+df1 = MSR %>% 
+  transmute(
+    first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
+    last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
+    middle_name = middle_name, 
+    birth_year = as.numeric(unified_birth_year),
+    unique_id = str_remove(unique_id, "^0+"),
+    birth_place = birth_place
+  ) %>% 
+  mutate_if(is.character, ~na_if(., '')) %>% 
+  filter(lname_1=="O")
+
+df2 = CEN %>% 
+  transmute(
+    first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
+    last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
+    middle_name = middle_name, 
+    birth_year = as.numeric(birth_year),
+    unique_id = ifelse(is.na(unique_id), paste0("FAM_", 1:length(unique_id)), str_remove(unique_id, "^0+")),
+    birth_place = birth_place
+  ) %>% 
+  mutate_if(is.character, ~na_if(., '')) %>% 
+  filter(lname_1=="O")
+
+if (nrow(df2) > nrow(df1)) {
+  temp = df1
+  df1 = df2
+  df2 = temp
+}
+
+jaro = comparator::JaroWinkler(similarity=FALSE)
+lev = comparator::Levenshtein(normalize=TRUE)
+binary = comparator::BinaryComp()
+numeric = comparator::Manhattan()
+
+lev_breaks = c(-0.1, 0, 0.25, 0.5, 1.1)
+bin_breaks = c(-0.1, 0.5, 1.1)
+num_breaks = c(-1, 1, 5, 200)
+compData = compareRecords2(
+  df1,
+  df2,
+  fields = c("first_name", "last_name", "middle_name", "birth_year"),
+  comparators = list(lev, lev, binary, numeric),
+  breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
+)
+
+Zchain <- bipartiteGibbs(compData, nIter=5000, seed=0)$Z[, 1000:5000]
+
+BRL_est = FScoreBRL::linkage_estimate(type="BRL", Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type="F", Zchain, nrow(df1), nrow(df2))
+
+all_ids = c(df1$unique_id, df2$unique_id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(nrow(df1) + 1, nrow(df2))
+matched_indices = which(df2$unique_id %in% dup_ids)
+actual[matched_indices] = match(df2$unique_id[matched_indices], df1$unique_id)
+
+F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+
+data.table::rbindlist(list(F_metrics, BRL_metrics))
+```
+
+
 
 

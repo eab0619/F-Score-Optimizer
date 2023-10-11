@@ -17,7 +17,7 @@ myCompData <- compareRecords(
   flds=c("fname_c1", "lname_c1", "by", "bm", "bd"),
   types=c("lv", "lv", rep("nu", 3))
 )
-Zchain <- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
+Zchain <- bipartiteGibbs(myCompData, nIter=5000, seed=0)$Z[, 1000:5000]
 
 BRL_est = FScoreBRL::linkage_estimate(type="BRL", Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type="F", Zchain, nrow(df1), nrow(df2))
@@ -31,11 +31,6 @@ actual[matched_indices] = match(df2$id[matched_indices], df1$id)
 
 F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
 BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
-
-print("F_metrics")
-print(F_metrics)
-print("BRL_metrics")
-print(BRL_metrics)
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))
 ```

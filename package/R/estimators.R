@@ -1,5 +1,5 @@
 #' @export
-linkage_estimate <- function(type = "BRL", chain, n1, n2, l_10 = 1, l_01 = 1, l_11 = 2, b = 1) {
+linkage_estimate <- function(type = "BRL", chain, n1, n2, l_10 = 1, l_01 = 1, l_11 = 2, b = 1, step=NULL, mc.cores=1) {
   assert::assert(n2 <= n1, msg="dataset 2 must be smaller than dataset 1")
   
   # create posterior from chain
@@ -18,26 +18,36 @@ linkage_estimate <- function(type = "BRL", chain, n1, n2, l_10 = 1, l_01 = 1, l_
 
   # F score bayes estimate
   if (type == "F") {
-    # outer list to keep track of top k linkage
-    outer <- list()
-    # outer f score vector for each top k linkage
-    score <- c()
-    # since n2=min(n1,n2), the top k selection only goes up to n2 starting inner maximization
-    for (k in 1:n2) {
-      # create delta matrix delta <- create_F_Delta_K(chain=chain,posterior=posterior,tableLabels=tableLabels,k=k,b=b)
+    if (is.null(step)) {
+      step = floor(sqrt(n2))
+    }
+    kLinksLinkage <- function(k) {
       delta <- as.matrix(deltaMatrix_from_BRLchain(chain, n1, n2, k = k))
       result <- lsap(delta, k = k) # top k result
       result[result > n1] <- n1 + 1 # code all non matches to have n1 +1 index
-
       valid_indices <- which(result <= n1)
       res_score <- sum(delta[result[valid_indices], valid_indices])
-      
-      score <- c(score, res_score) # append result score to score vector
-      outer <- c(outer, list(result)) # append result to outer list
+      return(list(
+        score = res_score,
+        linkage = result
+      ))
     }
-
-    # outer maximization
-    return(outer[[which.max(score)]])
+    
+    grid0 = seq(0, n2, by=step)
+    results = parallel::mclapply(grid0, kLinksLinkage, mc.cores=mc.cores)
+    if (step > 1) {
+      k0 = which.max(map(results, "score"))
+      grid1 = c(
+        seq(max(0, k0 - step+1), k0-1), 
+        seq(k0+1, min(k0 + step-1, n2))
+      )
+      results1 = parallel::mclapply(grid1, kLinksLinkage, mc.cores=mc.cores)
+      results = c(results, results1)
+    }
+    scores = map(results, "score")
+    linkages = map(results, "linkage")
+    
+    return(linkages[[which.max(scores)]])
   } else {
     stop("you must provide a valid model type")
   }

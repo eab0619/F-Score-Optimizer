@@ -13,6 +13,7 @@ Requires:
   MatrixExtra
   RecordLinkage
   tidyverse
+  parallel
 Suggests: 
     knitr,
     rmarkdown,

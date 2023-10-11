@@ -1,4 +1,13 @@
-
+---
+title: "Union experiment"
+output: 
+  html_document: default
+  pdf_document: default
+vignette: >
+  %\VignetteIndexEntry{union}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
 ## Data Preparation
 

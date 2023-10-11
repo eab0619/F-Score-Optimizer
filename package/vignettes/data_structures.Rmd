@@ -1,6 +1,8 @@
 ---
 title: "Data Structures for Bipartite Record Linkage"
-output: rmarkdown::html_vignette
+output: 
+  html_document: default
+  pdf_document: default
 vignette: >
   %\VignetteIndexEntry{data_structures}
   %\VignetteEngine{knitr::rmarkdown}

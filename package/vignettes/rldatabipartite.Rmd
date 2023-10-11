@@ -1,3 +1,13 @@
+---
+title: "RLdata-bipartite experiment"
+output: 
+  html_document: default
+  pdf_document: default
+vignette: >
+  %\VignetteIndexEntry{rldatabipartite}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
 
 ```{r}
 library(BRL)

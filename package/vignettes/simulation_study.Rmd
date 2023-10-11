@@ -1,8 +1,10 @@
 ---
 title: "Simulation Study"
-output: rmarkdown::html_vignette
+output: 
+  html_document: default
+  pdf_document: default
 vignette: >
-  %\VignetteIndexEntry{simulation_study}
+  %\VignetteIndexEntry{simulation}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -118,7 +120,7 @@ estimators <- list(BRL=function(chain) {linkage_estimate(type="BRL", chain, n1, 
 #first expand grid
 params = expand.grid(scenario=scenarios, estimator = estimators, stringsAsFactors = FALSE)
 params_row_list = split(params, seq(nrow(params)))
-ncores = parallel::detectCores()-1
+ncores = 1
 
 #apply to get link estimates per scenario per algorithm
 estimates = parallel::mclapply(params_row_list, function(x){x$estimator[[1]](x$scenario[[1]]()$chain)}, mc.cores=ncores)

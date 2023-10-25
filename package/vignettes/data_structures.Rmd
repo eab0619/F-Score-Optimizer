@@ -5,8 +5,8 @@ output:
   pdf_document: default
 vignette: >
   %\VignetteIndexEntry{data_structures}
-  %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
 ---
 
 ```{r, include = FALSE}

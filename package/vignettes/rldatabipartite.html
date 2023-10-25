@@ -353,6 +353,7 @@ display: none;
 </div>
 
 
+<p>MODEL A</p>
 <pre class="r"><code>library(BRL)
 library(tidyverse)</code></pre>
 <pre><code>## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
@@ -365,7 +366,120 @@ library(tidyverse)</code></pre>
 ## ✖ dplyr::filter() masks stats::filter()
 ## ✖ dplyr::lag()    masks stats::lag()
 ## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
-<pre class="r"><code>library(FScoreBRL)
+<pre class="r"><code>library(FScoreBRL)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;FScoreBRL&#39;
+## 
+## The following object is masked from &#39;package:stats&#39;:
+## 
+##     simulate</code></pre>
+<pre class="r"><code>load(&quot;../../data-raw/RLdata_bipartite.RData&quot;) # RLdata500_bipartite and RLdata10000_bipartite
+
+data = RLdata500_bipartite %&gt;% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
+
+df1 = data %&gt;% filter(file==1)
+df2 = data %&gt;% filter(file==2)
+
+myCompData &lt;- compareRecords(
+  df1, 
+  df2, 
+  flds=c(&quot;by&quot;, &quot;bm&quot;, &quot;bd&quot;),
+  types=c(rep(&quot;bi&quot;, 3))
+)
+Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
+
+BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2), step=1)
+
+all_ids = c(df1$id, df2$id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(252, nrow(df2))
+matched_indices = which(df2$id %in% dup_ids)
+actual[matched_indices] = match(df2$id[matched_indices], df1$id)
+
+F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+
+data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
+<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
+## 1:   0.90625   0.58    1.5625 0.7073171   0.6029857    40   122              32
+## 2:   0.90625   0.58    1.5625 0.7073171   0.6029857    40   122              32
+##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
+## 1:           50           450                468              0.04
+## 2:           50           450                468              0.04</code></pre>
+<p>MODEL B</p>
+<pre class="r"><code>data = RLdata500_bipartite %&gt;% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
+
+df1 = data %&gt;% filter(file==1)
+df2 = data %&gt;% filter(file==2)
+
+myCompData &lt;- compareRecords(
+  df1, 
+  df2, 
+  flds=c(&quot;lname_c1&quot;, &quot;by&quot;),
+  types=c(rep(&quot;lv&quot;, 1), rep(&quot;lv&quot;, 0), rep(&quot;bi&quot;, 1))
+)
+Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
+
+BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2), step=1)
+
+all_ids = c(df1$id, df2$id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(252, nrow(df2))
+matched_indices = which(df2$id %in% dup_ids)
+actual[matched_indices] = match(df2$id[matched_indices], df1$id)
+
+F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+
+data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
+<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
+## 1: 0.7884615   0.82 0.9615385 0.8039216   0.5880766    41   131              52
+## 2: 0.7872340   0.74 1.0638298 0.7628866   0.5773995    41   131              47
+##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
+## 1:           50           450                448      -0.004444444
+## 2:           50           450                453       0.006666667</code></pre>
+<p>MODEL C</p>
+<pre class="r"><code>data = RLdata500_bipartite %&gt;% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
+
+df1 = data %&gt;% filter(file==1)
+df2 = data %&gt;% filter(file==2)
+
+myCompData &lt;- compareRecords(
+  df1, 
+  df2, 
+  flds=c(&quot;fname_c1&quot;, &quot;lname_c1&quot;, &quot;by&quot;),
+  types=c(&quot;lv&quot;, &quot;lv&quot;, rep(&quot;bi&quot;, 1))
+)
+Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
+
+BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2), step=1)
+
+all_ids = c(df1$id, df2$id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(252, nrow(df2))
+matched_indices = which(df2$id %in% dup_ids)
+actual[matched_indices] = match(df2$id[matched_indices], df1$id)
+
+F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+
+data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
+<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
+## 1: 0.9767442   0.84  1.162791 0.9032258   0.9184141    44    59              43
+## 2: 0.9767442   0.84  1.162791 0.9032258   0.9184141    44    59              43
+##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
+## 1:           50           450                457        0.01555556
+## 2:           50           450                457        0.01555556</code></pre>
+<p>MODEL D</p>
+<pre class="r"><code>library(BRL)
+library(tidyverse)
+library(FScoreBRL)
 
 load(&quot;../../data-raw/RLdata_bipartite.RData&quot;) # RLdata500_bipartite and RLdata10000_bipartite
 
@@ -378,12 +492,12 @@ myCompData &lt;- compareRecords(
   df1, 
   df2, 
   flds=c(&quot;fname_c1&quot;, &quot;lname_c1&quot;, &quot;by&quot;, &quot;bm&quot;, &quot;bd&quot;),
-  types=c(&quot;lv&quot;, &quot;lv&quot;, rep(&quot;nu&quot;, 3))
+  types=c(&quot;lv&quot;, &quot;lv&quot;, rep(&quot;bi&quot;, 3))
 )
-Zchain &lt;- bipartiteGibbs(myCompData, nIter=5000, seed=0)$Z[, 1000:5000]
+Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
 
 BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
-F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2), step=1)
 
 all_ids = c(df1$id, df2$id)
 dup_ids = all_ids[duplicated(all_ids)]
@@ -396,78 +510,12 @@ F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
 BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
-<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
-## 1: 1.0000000    0.9 1.1111111 0.9473684    0.939081    49    54              45
-## 2: 0.9803922    1.0 0.9803922 0.9900990    0.981518    49    54              51
+<pre><code>##    precision recall p_r_ratio  f_score est_f_score lower upper induced_overlap
+## 1: 0.9803922      1 0.9803922 0.990099   0.9810375    49    54              51
+## 2: 0.9803922      1 0.9803922 0.990099   0.9810375    49    54              51
 ##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
-## 1:           50           450                455       0.011111111
+## 1:           50           450                449      -0.002222222
 ## 2:           50           450                449      -0.002222222</code></pre>
-<pre class="r"><code>data = RLdata500_bipartite %&gt;% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
-
-df1 = data %&gt;% filter(file==1)
-df2 = data %&gt;% filter(file==2)
-
-myCompData &lt;- compareRecords(
-  df1, 
-  df2, 
-  flds=c(&quot;fname_c1&quot;, &quot;lname_c1&quot;, &quot;by&quot;),
-  types=c(&quot;lv&quot;, &quot;lv&quot;, rep(&quot;nu&quot;, 1))
-)
-Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
-
-BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
-F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
-
-all_ids = c(df1$id, df2$id)
-dup_ids = all_ids[duplicated(all_ids)]
-
-actual = rep(252, nrow(df2))
-matched_indices = which(df2$id %in% dup_ids)
-actual[matched_indices] = match(df2$id[matched_indices], df1$id)
-
-F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
-BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
-
-data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
-<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
-## 1: 0.9333333   0.84  1.111111 0.8842105   0.9151992    43    58              45
-## 2: 0.9767442   0.84  1.162791 0.9032258   0.9236701    43    58              43
-##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
-## 1:           50           450                455        0.01111111
-## 2:           50           450                457        0.01555556</code></pre>
-<pre class="r"><code>data = RLdata500_bipartite %&gt;% mutate(by = as.numeric(by), bm = as.numeric(bm), bd = as.numeric(bd))
-
-df1 = data %&gt;% filter(file==1)
-df2 = data %&gt;% filter(file==2)
-
-myCompData &lt;- compareRecords(
-  df1, 
-  df2, 
-  flds=c(&quot;lname_c1&quot;, &quot;by&quot;),
-  types=c(rep(&quot;lv&quot;, 1), rep(&quot;lv&quot;, 0), rep(&quot;nu&quot;, 1))
-)
-Zchain &lt;- bipartiteGibbs(myCompData, nIter=25000, seed=0)$Z[, 5000:25000]
-
-BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
-F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
-
-all_ids = c(df1$id, df2$id)
-dup_ids = all_ids[duplicated(all_ids)]
-
-actual = rep(252, nrow(df2))
-matched_indices = which(df2$id %in% dup_ids)
-actual[matched_indices] = match(df2$id[matched_indices], df1$id)
-
-F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
-BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
-
-data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
-<pre><code>##    precision recall p_r_ratio   f_score est_f_score lower upper induced_overlap
-## 1:  0.800000   0.72  1.111111 0.7578947   0.6143534    37   109              45
-## 2:  0.787234   0.74  1.063830 0.7628866   0.6240725    37   109              47
-##    true_overlap true_pop_size estimated_pop_size pop_size_rel_bias
-## 1:           50           450                455       0.011111111
-## 2:           50           450                453       0.006666667</code></pre>
 
 
 

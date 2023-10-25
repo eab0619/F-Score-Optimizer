@@ -356,10 +356,20 @@ display: none;
 <div id="data-preparation" class="section level2">
 <h2>Data Preparation</h2>
 <p>Loading data</p>
-<pre class="r"><code>library(readr)
-library(tidyverse)
+<pre class="r"><code>set.seed(0)
 
-paste0_named = function(names, ...) setNames(paste0(...), names)
+library(readr)
+library(tidyverse)</code></pre>
+<pre><code>## ── Attaching core tidyverse packages ──────────────────────── tidyverse 2.0.0 ──
+## ✔ dplyr     1.1.3     ✔ purrr     1.0.2
+## ✔ forcats   1.0.0     ✔ stringr   1.5.0
+## ✔ ggplot2   3.4.3     ✔ tibble    3.2.1
+## ✔ lubridate 1.9.2     ✔ tidyr     1.3.0
+## ── Conflicts ────────────────────────────────────────── tidyverse_conflicts() ──
+## ✖ dplyr::filter() masks stats::filter()
+## ✖ dplyr::lag()    masks stats::lag()
+## ℹ Use the conflicted package (&lt;http://conflicted.r-lib.org/&gt;) to force all conflicts to become errors</code></pre>
+<pre class="r"><code>paste0_named = function(names, ...) setNames(paste0(...), names)
 
 union_cen = read_csv(&quot;../../data-raw/Union/cen_union_army_whites_csv.csv&quot;, cols(.default = &quot;c&quot;))</code></pre>
 <pre><code>## Rows: 25676 Columns: 1623
@@ -416,7 +426,9 @@ CEN = rbind(
     regex = &quot;\\s*(\\w+)\\s*,?\\s*(\\w+)(?:\\s*(\\w+))?\\s*(?:\\((.+)\\))?&quot;,
     remove = FALSE
   ) %&gt;% 
-  mutate_if(is.character, ~na_if(., &#39;&#39;))</code></pre>
+  mutate_if(is.character, ~na_if(., &#39;&#39;))
+
+readr::write_csv(CEN, &quot;../../data-raw/CEN.csv&quot;, na=&quot;&quot;)</code></pre>
 <p>Preparing data from military service records.</p>
 <pre class="r"><code>variables = c(
   unique_id = &quot;recidnum&quot;,
@@ -461,7 +473,8 @@ MSR = MSR_wide %&gt;%
     regex = &quot;\\s*(\\w+)\\s*,?\\s*(\\w+)(?:\\s*(\\w+))?\\s*(?:\\((.+)\\))?&quot;,
     remove = FALSE
   ) %&gt;% 
-  mutate_if(is.character, ~na_if(., &#39;&#39;))</code></pre>
+  mutate(unique_id = str_remove(unique_id, &quot;^0+&quot;)) %&gt;% 
+  mutate_if(is.character, ~na_if(., &#39;&#39;)) </code></pre>
 <pre><code>## Warning: There was 1 warning in `mutate()`.
 ## ℹ In argument: `enlistment_year = case_when(...)`.
 ## Caused by warning:
@@ -472,6 +485,7 @@ MSR = MSR_wide %&gt;%
 ## Caused by warning:
 ## ! NAs introduced by coercion
 ## ℹ Run `dplyr::last_dplyr_warnings()` to see the 1 remaining warning.</code></pre>
+<pre class="r"><code>readr::write_csv(MSR, &quot;../../data-raw/MSR.csv&quot;, na=&quot;&quot;)</code></pre>
 <pre class="r"><code>MSR %&gt;% 
   group_by(birth_place) %&gt;% 
   summarise(count=n()) %&gt;% 
@@ -539,9 +553,13 @@ compareRecords2 &lt;- function(df1, df2, fields, comparators, breaks_list) {
 }</code></pre>
 <pre class="r"><code>library(BRL)
 library(tidyverse)
-library(FScoreBRL)
-
-df1 = MSR %&gt;% 
+library(FScoreBRL)</code></pre>
+<pre><code>## 
+## Attaching package: &#39;FScoreBRL&#39;</code></pre>
+<pre><code>## The following object is masked from &#39;package:stats&#39;:
+## 
+##     simulate</code></pre>
+<pre class="r"><code>df1 = MSR %&gt;% 
   transmute(
     first_name = first_name, 
     fname_1 = substr(first_name, 1, 1),
@@ -596,7 +614,7 @@ compData = compareRecords2(
   breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
 )
 
-Zchain &lt;- bipartiteGibbs(compData, nIter=5000, seed=0)$Z[, 1000:5000]
+Zchain &lt;- bipartiteGibbs(compData, nIter=25000, seed=0)$Z[, 5000:25000]
 
 BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
@@ -613,14 +631,98 @@ BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
 <pre><code>##    precision    recall p_r_ratio   f_score est_f_score lower upper
-## 1: 0.9378882 0.8031915  1.167702 0.8653295   0.8869133   150   179
-## 2: 0.9612903 0.7925532  1.212903 0.8688047   0.8859642   150   179
+## 1: 0.9440994 0.8085106  1.167702 0.8710602   0.8882138   150   178
+## 2: 0.9610390 0.7872340  1.220779 0.8654971   0.8871007   150   178
 ##    induced_overlap true_overlap true_pop_size estimated_pop_size
 ## 1:             161          188          2181               2208
-## 2:             155          188          2181               2214
+## 2:             154          188          2181               2215
 ##    pop_size_rel_bias
 ## 1:        0.01237964
-## 2:        0.01513067</code></pre>
+## 2:        0.01558918</code></pre>
+<pre class="r"><code>library(BRL)
+library(tidyverse)
+library(FScoreBRL)
+
+df1 = MSR %&gt;% 
+  transmute(
+    first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
+    last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
+    middle_name = middle_name, 
+    birth_year = as.numeric(unified_birth_year),
+    unique_id = str_remove(unique_id, &quot;^0+&quot;),
+    birth_place = birth_place
+  ) %&gt;% 
+  mutate_if(is.character, ~na_if(., &#39;&#39;)) %&gt;% 
+  filter(birth_place==&quot;MI&quot;)
+
+df2 = CEN %&gt;% 
+  transmute(
+    first_name = first_name, 
+    fname_1 = substr(first_name, 1, 1),
+    #fname_2 = substr(first_name, 2, 1000L),
+    last_name = last_name, 
+    lname_1 = substr(last_name, 1, 1),
+    middle_name = middle_name, 
+    birth_year = as.numeric(birth_year),
+    unique_id = ifelse(is.na(unique_id), paste0(&quot;FAM_&quot;, 1:length(unique_id)), str_remove(unique_id, &quot;^0+&quot;)),
+    birth_place = birth_place
+  ) %&gt;% 
+  mutate_if(is.character, ~na_if(., &#39;&#39;)) %&gt;% 
+  filter(birth_place==&quot;MI&quot;)</code></pre>
+<pre><code>## Warning: There was 1 warning in `transmute()`.
+## ℹ In argument: `birth_year = as.numeric(birth_year)`.
+## Caused by warning:
+## ! NAs introduced by coercion</code></pre>
+<pre class="r"><code>if (nrow(df2) &gt; nrow(df1)) {
+  temp = df1
+  df1 = df2
+  df2 = temp
+}
+
+jaro = comparator::JaroWinkler(similarity=FALSE)
+lev = comparator::Levenshtein(normalize=TRUE)
+binary = comparator::BinaryComp()
+numeric = comparator::Manhattan()
+
+lev_breaks = c(-0.1, 0, 0.1, 0.5, 1.1)
+bin_breaks = c(-0.1, 0.5, 1.1)
+num_breaks = c(-1, 1, 5, 200)
+compData = compareRecords2(
+  df1,
+  df2,
+  fields = c(&quot;first_name&quot;, &quot;last_name&quot;, &quot;middle_name&quot;, &quot;birth_year&quot;),
+  comparators = list(lev, lev, binary, numeric),
+  breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
+)
+
+Zchain &lt;- bipartiteGibbs(compData, nIter=25000, seed=0)$Z[, 5000:25000]
+
+BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
+F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
+
+all_ids = c(df1$unique_id, df2$unique_id)
+dup_ids = all_ids[duplicated(all_ids)]
+
+actual = rep(nrow(df1) + 1, nrow(df2))
+matched_indices = which(df2$unique_id %in% dup_ids)
+actual[matched_indices] = match(df2$unique_id[matched_indices], df1$unique_id)
+
+F_metrics = FScoreBRL::metrics(F_est, actual, Zchain, nrow(df1), nrow(df2))
+BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
+
+data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
+<pre><code>##    precision    recall p_r_ratio   f_score est_f_score lower upper
+## 1: 0.8913043 0.6542553  1.362319 0.7546012   0.8307790   125   161
+## 2: 0.9658120 0.6010638  1.606838 0.7409836   0.8193863   125   161
+##    induced_overlap true_overlap true_pop_size estimated_pop_size
+## 1:             138          188          2181               2231
+## 2:             117          188          2181               2252
+##    pop_size_rel_bias
+## 1:        0.02292526
+## 2:        0.03255387</code></pre>
 <pre class="r"><code>library(BRL)
 library(tidyverse)
 library(FScoreBRL)
@@ -680,7 +782,7 @@ compData = compareRecords2(
   breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
 )
 
-Zchain &lt;- bipartiteGibbs(compData, nIter=5000, seed=0)$Z[, 1000:5000]
+Zchain &lt;- bipartiteGibbs(compData, nIter=25000, seed=0)$Z[, 5000:25000]
 
 BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
@@ -697,14 +799,14 @@ BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
 <pre><code>##    precision    recall p_r_ratio   f_score est_f_score lower upper
-## 1: 0.8522727 0.5208333  1.636364 0.6465517   0.6414257    78   111
-## 2: 0.9047619 0.3958333  2.285714 0.5507246   0.6077957    78   111
+## 1: 0.8636364 0.5277778  1.636364 0.6551724   0.6413730    77   110
+## 2: 0.8965517 0.3611111  2.482759 0.5148515   0.5954666    77   110
 ##    induced_overlap true_overlap true_pop_size estimated_pop_size
 ## 1:              88          144           959               1015
-## 2:              63          144           959               1040
+## 2:              58          144           959               1045
 ##    pop_size_rel_bias
 ## 1:        0.05839416
-## 2:        0.08446298</code></pre>
+## 2:        0.08967675</code></pre>
 <pre class="r"><code>library(BRL)
 library(tidyverse)
 library(FScoreBRL)
@@ -764,7 +866,7 @@ compData = compareRecords2(
   breaks_list = list(lev_breaks, lev_breaks, bin_breaks, num_breaks)
 )
 
-Zchain &lt;- bipartiteGibbs(compData, nIter=5000, seed=0)$Z[, 1000:5000]
+Zchain &lt;- bipartiteGibbs(compData, nIter=25000, seed=0)$Z[, 5000:25000]
 
 BRL_est = FScoreBRL::linkage_estimate(type=&quot;BRL&quot;, Zchain, nrow(df1), nrow(df2))
 F_est = FScoreBRL::linkage_estimate(type=&quot;F&quot;, Zchain, nrow(df1), nrow(df2))
@@ -781,8 +883,8 @@ BRL_metrics = FScoreBRL::metrics(BRL_est, actual, Zchain, nrow(df1), nrow(df2))
 
 data.table::rbindlist(list(F_metrics, BRL_metrics))</code></pre>
 <pre><code>##    precision    recall p_r_ratio   f_score est_f_score lower upper
-## 1: 0.7500000 0.4583333  1.636364 0.5689655   0.5737442    59    99
-## 2: 0.8636364 0.1319444  6.545455 0.2289157   0.4119270    59    99
+## 1: 0.7500000 0.4583333  1.636364 0.5689655   0.5712657    59    99
+## 2: 0.8636364 0.1319444  6.545455 0.2289157   0.4120061    59    99
 ##    induced_overlap true_overlap true_pop_size estimated_pop_size
 ## 1:              88          144           959               1015
 ## 2:              22          144           959               1081

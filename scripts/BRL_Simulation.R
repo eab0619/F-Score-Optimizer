@@ -6,7 +6,7 @@ require(MCMCpack)
 
 
 ##Note this function requires running optimization.R to get the F Score algorithm
-
+ 
 simulate_BRL <- function(n1=1000, n2=50, 
                          aBM=100, bBM=50,
                          num_field=3,
